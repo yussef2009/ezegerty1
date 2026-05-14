@@ -4,7 +4,7 @@ import { Loader2, Package, MapPin, Truck, CheckCircle, Clock } from "lucide-reac
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { motion } from "motion/react";
-import { projectId, publicAnonKey } from "/utils/supabase/info";
+import { projectId, publicAnonKey } from "../../supabase/info";
 
 type OrderStatus = "pending" | "cleaning" | "ready" | "delivered";
 

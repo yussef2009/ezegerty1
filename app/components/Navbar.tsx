@@ -4,7 +4,7 @@ import { useTheme } from "next-themes";
 import { Menu, X, Sun, Moon, User, Settings, History, LogOut, LayoutDashboard, Truck } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "../../lib/utils";
-import logo from "figma:asset/811d8ca945b29bf3de2536f0f56fcdbe02cb9813.png";
+const logo = "https://placehold.co/100x40/png";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import {

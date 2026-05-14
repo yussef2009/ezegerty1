@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
-import { projectId, publicAnonKey } from "/utils/supabase/info";
+import { projectId, publicAnonKey } from "../../supabase/info";
 import { Search, Package, Truck, CheckCircle, Clock, MapPin, RefreshCw, ChevronLeft } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../context/AuthContext";

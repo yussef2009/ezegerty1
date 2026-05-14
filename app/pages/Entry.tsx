@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { User, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
-import logo from "figma:asset/811d8ca945b29bf3de2536f0f56fcdbe02cb9813.png";
+const logo = "https://placehold.co/100x40/png";
 
 export function Entry() {
   return (

@@ -24,7 +24,7 @@ import {
   DialogDescription,
   DialogFooter
 } from "../../components/ui/dialog";
-import { projectId, publicAnonKey } from "/utils/supabase/info";
+import { projectId, publicAnonKey } from "../../../supabase/info";
 
 type Client = {
   id: string;
