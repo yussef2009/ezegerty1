@@ -97,7 +97,7 @@ export function AdminLogin() {
               type="button"
               variant="outline"
               onClick={async () => {
-                const { error } = await signInWithGoogle("/admin/dashboard");
+                const { error } = await signInWithGoogle("/admin/dashboard", "admin");
                 if (error) {
                   setError(error.message);
                 }

@@ -103,7 +103,7 @@ export function ClientLogin() {
               type="button"
               variant="outline"
               onClick={async () => {
-                const { error } = await signInWithGoogle("/client/dashboard");
+                const { error } = await signInWithGoogle("/client/dashboard", "client");
                 if (error) {
                   setError(error.message);
                 }
