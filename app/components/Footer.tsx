@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Shirt, Facebook, Instagram, Twitter, MapPin, Phone, Mail } from "lucide-react";
-const logo = "https://placehold.co/100x40/png";
+const logo = "/logo.png";
 import { useLanguage } from "../context/LanguageContext";
 
 export function Footer() {

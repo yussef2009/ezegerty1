@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { 
@@ -30,15 +30,17 @@ export function AdminLayout() {
   const { user, signOut, role, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  // Development bypass: append ?dev=1 to the URL to view admin pages without auth in dev
+  const devBypass = import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1";
   const [isSidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    if (!loading && (!user || role !== "admin")) {
+    if (!loading && (!user || role !== "admin") && !devBypass) {
       navigate("/admin-login");
     }
-  }, [user, role, loading, navigate]);
+  }, [user, role, loading, navigate, devBypass]);
 
-  if (loading || (!user || role !== "admin")) {
+  if (!devBypass && (loading || (!user || role !== "admin"))) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { User, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
-const logo = "https://placehold.co/100x40/png";
+const logo = "/logo.png";
 
 export function Entry() {
   return (
