@@ -7,6 +7,9 @@ const supabase = createClient(
   publicAnonKey
 );
 
+// Enable a dev-only auto-login when running the dev server with `?dev=1`
+const devAutoLogin = import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1";
+
 type AuthContextType = {
   session: Session | null;
   user: User | null;
@@ -36,6 +39,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (devAutoLogin) {
+      const mockUser = {
+        id: "dev-admin",
+        email: "admin@dev.local",
+        user_metadata: { role: "admin", name: "Dev Admin" },
+      } as unknown as User;
+      setSession(null);
+      setUser(mockUser);
+      setRole("admin");
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -88,6 +104,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (devAutoLogin) {
+      setSession(null);
+      setUser(null);
+      setRole(null);
+      return;
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) console.error("Error signing out:", error);
   };
