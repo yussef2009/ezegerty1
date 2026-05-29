@@ -50,7 +50,7 @@ export function Tracker() {
       });
       const data = await response.json();
       if (data.values) {
-        const userOrders = data.values.filter((o: any) => o.userId === user.id || o.email === user.email);
+        const userOrders = data.values.filter((o: any) => o.userId === user.id || o.userEmail === user.email);
         if (userOrders.length > 0) {
           const latest = userOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
           setOrder(latest);
