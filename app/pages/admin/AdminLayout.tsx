@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router";
 import { useAuth } from "../../context/AuthContext";

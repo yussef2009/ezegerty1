@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { createClient, Session, User } from "@supabase/supabase-js";
 import { projectId, publicAnonKey } from "../../supabase/info";
