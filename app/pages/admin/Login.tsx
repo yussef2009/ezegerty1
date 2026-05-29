@@ -16,10 +16,11 @@ export function AdminLogin() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!authLoading && user) {
-      if (role === "admin") {
+    if (!authLoading && user && role) {
+      if (role === "admin" || role === "delivery") {
         navigate("/admin/dashboard");
       } else {
+        // role is a non-null, non-admin role — redirect to client area
         navigate("/client/dashboard");
       }
     }
@@ -32,9 +33,8 @@ export function AdminLogin() {
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else {
-      navigate("/admin/dashboard");
     }
+    // Navigation is handled by the useEffect above once role is confirmed
   };
 
   return (
