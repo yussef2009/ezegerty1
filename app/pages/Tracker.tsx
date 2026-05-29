@@ -6,7 +6,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { dbGet, dbGetByPrefix } from "../lib/db";
-import { Search, Package, Truck, CheckCircle, Clock, MapPin, RefreshCw, ChevronLeft } from "lucide-react";
+import { Search, Package, Truck, CheckCircle, Clock, MapPin, RefreshCw, ChevronLeft, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../context/AuthContext";
 
