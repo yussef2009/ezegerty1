@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { Loader2, Plus, Trash2, Edit2, Save, X } from "lucide-react";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { Loader2, Plus, Trash2, Edit2, Save, X, WashingMachine } from "lucide-react";
+import { dbGet, dbSet } from "../../lib/db";
 
 type Service = {
   id: string;
@@ -23,11 +23,8 @@ export function AdminServices() {
   const fetchServices = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/get/services`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.value) setServices(data.value || []);
+      const data = await dbGet("services");
+      if (data) setServices(data || []);
     } catch (error) {
       console.error("Error fetching services:", error);
     } finally {
@@ -41,17 +38,7 @@ export function AdminServices() {
 
   const saveServices = async (updatedServices: Service[]) => {
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          key: "services",
-          value: updatedServices
-        })
-      });
+      await dbSet("services", updatedServices);
       setServices(updatedServices);
     } catch (error) {
       console.error("Error saving services:", error);

@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
-import { projectId, publicAnonKey } from "../../supabase/info";
+import { dbGet, dbGetByPrefix } from "../lib/db";
 import { Search, Package, Truck, CheckCircle, Clock, MapPin, RefreshCw, ChevronLeft } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../context/AuthContext";
@@ -20,17 +20,38 @@ export function Tracker() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (!order || order.status !== "delivering") {
+      setDriverLocation(null);
+      return;
+    }
+
+    const fetchLocation = async () => {
+      try {
+        const loc = await dbGet(`driver_location:${order.id}`);
+        if (loc && loc.lat && loc.lng) {
+          setDriverLocation({ lat: loc.lat, lng: loc.lng });
+        }
+      } catch (err) {
+        console.error("Error fetching driver location:", err);
+      }
+    };
+
+    fetchLocation();
+    const interval = setInterval(fetchLocation, 5000);
+    return () => clearInterval(interval);
+  }, [order]);
+
 
   const fetchOrder = async (id: string) => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/get/order:${id}`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const result = await response.json();
-      if (result.value) {
-        setOrder(result.value);
+      const value = await dbGet(`order:${id}`);
+      if (value) {
+        setOrder(value);
       } else {
         setError("Order not found. Please check your Order ID.");
       }
@@ -45,17 +66,12 @@ export function Tracker() {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        const userOrders = data.values.filter((o: any) => o.userId === user.id || o.userEmail === user.email);
-        if (userOrders.length > 0) {
-          const latest = userOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-          setOrder(latest);
-          setValue("orderId", latest.id);
-        }
+      const values = await dbGetByPrefix("order:");
+      const userOrders = values.filter((o: any) => o.userId === user.id || o.userEmail === user.email);
+      if (userOrders.length > 0) {
+        const latest = userOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        setOrder(latest);
+        setValue("orderId", latest.id);
       }
     } catch (err) {
       console.error("Error fetching latest order:", err);
@@ -82,7 +98,8 @@ export function Tracker() {
     { status: "pending", label: "Order Received", icon: Clock },
     { status: "cleaning", label: "Cleaning in Progress", icon: Package },
     { status: "ready", label: "Ready for Pickup/Delivery", icon: CheckCircle },
-    { status: "delivered", label: "Delivered", icon: Truck },
+    { status: "delivering", label: "Out for Delivery", icon: Truck },
+    { status: "delivered", label: "Delivered", icon: CheckCircle },
   ];
 
   const getCurrentStep = (status: string) => {
@@ -178,48 +195,65 @@ export function Tracker() {
                   transition={{ delay: 0.2 }}
                   className="rounded-xl bg-white p-6 shadow-sm dark:bg-gray-900 dark:border dark:border-gray-800"
                >
-                 <h3 className="mb-4 font-semibold text-gray-900 dark:text-white">Delivery Details</h3>
-                 
-                 <div className="mb-6 flex items-center gap-4">
-                   <img 
-                     src={DRIVER_IMAGE} 
-                     alt="Driver" 
-                     className="h-16 w-16 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-800"
-                   />
-                   <div>
-                     <p className="font-medium text-gray-900 dark:text-white">Ahmed Hassan</p>
-                     <p className="text-sm text-gray-500 dark:text-gray-400">Delivery Associate</p>
-                     <div className="mt-1 flex items-center text-xs text-yellow-500">
-                       ★★★★★ (4.9)
-                     </div>
-                   </div>
-                 </div>
-
-                 <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-                   <div className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400">
-                      <MapPin className="h-4 w-4" />
-                      Live Location
-                   </div>
-                   {/* Static Map Image Simulation */}
-                   <div className="relative h-48 w-full overflow-hidden rounded-md bg-gray-200">
-                      <img 
-                        src="https://maps.googleapis.com/maps/api/staticmap?center=31.2001,29.9242&zoom=14&size=400x300&sensor=false&key=YOUR_API_KEY" 
-                        onError={(e) => {
-                          e.currentTarget.src = "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"; // Fallback map-like image
-                        }}
-                        alt="Live Map"
-                        className="h-full w-full object-cover opacity-80"
-                      />
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                         <div className="flex h-8 w-8 animate-bounce items-center justify-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-blue-600/30">
-                            <Truck className="h-4 w-4" />
-                         </div>
+                  <h3 className="mb-4 font-semibold text-gray-900 dark:text-white">Delivery Details</h3>
+                  
+                  {order.status === "delivering" || order.status === "delivered" ? (
+                    <>
+                      <div className="mb-6 flex items-center gap-4">
+                        <img 
+                          src={DRIVER_IMAGE} 
+                          alt="Driver" 
+                          className="h-16 w-16 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-800"
+                        />
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">{order.driverName || "Ahmed Hassan"}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Delivery Associate</p>
+                          <div className="mt-1 flex items-center text-xs text-yellow-500">
+                            ★★★★★ (4.9)
+                          </div>
+                        </div>
                       </div>
-                   </div>
-                   <p className="mt-2 text-xs text-center text-gray-500">
-                     Expected Arrival: <span className="font-medium text-gray-900 dark:text-white">15-20 mins</span>
-                   </p>
-                 </div>
+
+                      <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+                        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                           <MapPin className="h-4 w-4" />
+                           {order.status === "delivered" ? "Delivered" : "Live Location"}
+                        </div>
+                        {order.status === "delivering" && driverLocation ? (
+                          <div className="relative h-48 w-full overflow-hidden rounded-md border dark:border-gray-700">
+                            <iframe
+                              title="Driver Live Location"
+                              width="100%"
+                              height="100%"
+                              className="border-0"
+                              src={`https://www.openstreetmap.org/export/embed.html?bbox=${driverLocation.lng - 0.003}%2C${driverLocation.lat - 0.003}%2C${driverLocation.lng + 0.003}%2C${driverLocation.lat + 0.003}&layer=mapnik&marker=${driverLocation.lat}%2C${driverLocation.lng}`}
+                            />
+                          </div>
+                        ) : order.status === "delivering" ? (
+                          <div className="flex h-48 w-full flex-col items-center justify-center rounded-md bg-gray-100 text-xs text-gray-400 dark:bg-gray-800">
+                            <Loader2 className="h-6 w-6 animate-spin text-blue-600 mb-2" />
+                            Waiting for driver GPS signal...
+                          </div>
+                        ) : (
+                          <div className="flex h-48 w-full flex-col items-center justify-center rounded-md bg-green-50 text-xs text-green-700 dark:bg-green-950/20 dark:text-green-400 font-semibold">
+                            <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
+                            Order delivered successfully!
+                          </div>
+                        )}
+                        {order.status === "delivering" && (
+                          <p className="mt-2 text-xs text-center text-gray-500">
+                            Status: <span className="font-semibold text-blue-600 dark:text-blue-400 animate-pulse">Out for Delivery</span>
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-gray-400 dark:text-gray-500">
+                      <Truck className="h-12 w-12 mb-3 text-gray-300 dark:text-gray-700" />
+                      <p className="text-sm font-medium">Tracking is not active yet</p>
+                      <p className="text-xs text-gray-500 mt-1 max-w-[200px]">Live GPS tracking begins when your driver leaves the laundry center.</p>
+                    </div>
+                  )}
                </motion.div>
             </div>
           )}

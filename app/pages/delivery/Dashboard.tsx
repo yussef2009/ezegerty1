@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGetByPrefix, dbSet } from "../../lib/db";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -12,7 +12,7 @@ type Order = {
   name: string;
   phone: string;
   address: string;
-  status: "pending" | "cleaning" | "ready" | "delivered";
+  status: "pending" | "cleaning" | "ready" | "delivering" | "delivered";
   paymentMethod: string;
   total: number;
   createdAt: string;
@@ -27,20 +27,15 @@ export function DeliveryDashboard() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        // Only show orders that are ready for delivery or currently in progress
-        const relevantOrders = data.values.filter((o: any) => 
-          o.status === 'ready' || o.status === 'delivered' || o.status === 'cleaning'
-        );
-        const sorted = relevantOrders.sort((a: Order, b: Order) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        setOrders(sorted);
-      }
+      const values = await dbGetByPrefix("order:");
+      // Only show orders that are ready for delivery, delivering, or currently in progress
+      const relevantOrders = values.filter((o: any) => 
+        o.status === 'ready' || o.status === 'delivering' || o.status === 'delivered' || o.status === 'cleaning'
+      );
+      const sorted = relevantOrders.sort((a: Order, b: Order) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setOrders(sorted);
     } catch (error) {
       console.error("Error fetching delivery orders:", error);
     } finally {
@@ -52,23 +47,48 @@ export function DeliveryDashboard() {
     fetchOrders();
   }, []);
 
+  useEffect(() => {
+    const deliveringOrder = orders.find(o => o.status === "delivering");
+    if (!deliveringOrder) return;
+
+    if (!navigator.geolocation) {
+      console.error("Geolocation not supported");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        await dbSet(`driver_location:${deliveringOrder.id}`, {
+          lat: latitude,
+          lng: longitude,
+          timestamp: new Date().toISOString()
+        });
+      },
+      (error) => {
+        console.error("Error watching position:", error);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [orders]);
+
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
     const updatedOrder = { ...order, status: newStatus };
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: `order:${orderId}`, value: updatedOrder })
-      });
+      await dbSet(`order:${orderId}`, updatedOrder);
       setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
     } catch (error) {
       console.error("Error updating status:", error);
     }
   };
 
-  const activeDeliveries = orders.filter(o => o.status === 'ready').length;
+  const activeDeliveries = orders.filter(o => o.status === 'ready' || o.status === 'delivering').length;
 
   return (
     <div className="space-y-8 min-h-screen pb-12">
@@ -100,12 +120,20 @@ export function DeliveryDashboard() {
                  animate={{ opacity: 1, y: 0 }}
                  className="group relative rounded-xl border bg-white p-5 shadow-sm transition-all hover:shadow-md dark:bg-gray-900 dark:border-gray-800"
                >
-                 <div className="flex items-center justify-between mb-4">
-                   <Badge variant={order.status === 'ready' ? 'secondary' : 'default'} className="uppercase font-mono text-[10px]">
-                     {order.status}
-                   </Badge>
-                   <p className="text-xs font-mono text-gray-400">#{order.id.split('_')[1]}</p>
-                 </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={order.status === 'ready' ? 'secondary' : order.status === 'delivering' ? 'outline' : 'default'} className="uppercase font-mono text-[10px]">
+                        {order.status}
+                      </Badge>
+                      {order.status === 'delivering' && (
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-mono text-gray-400">#{order.id.split('_')[1]}</p>
+                  </div>
                  
                  <div className="space-y-3">
                     <div className="flex items-start gap-3">
@@ -138,6 +166,7 @@ export function DeliveryDashboard() {
                          </SelectTrigger>
                          <SelectContent>
                            <SelectItem value="ready">Ready</SelectItem>
+                           <SelectItem value="delivering">Delivering</SelectItem>
                            <SelectItem value="delivered">Delivered</SelectItem>
                          </SelectContent>
                        </Select>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGetByPrefix } from "../../lib/db";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Loader2, TrendingUp, Users, ShoppingBag, Landmark, ArrowUpRight } from "lucide-react";
@@ -12,13 +12,8 @@ export function AdminServicesDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        setOrders(data.values);
-      }
+      const values = await dbGetByPrefix("order:");
+      setOrders(values);
     } catch (error) {
       toast.error("Failed to load statistics");
     } finally {

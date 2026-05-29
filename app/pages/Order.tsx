@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
-import { projectId, publicAnonKey } from "../../supabase/info";
+import { dbSet } from "../lib/db";
 
 type OrderFormData = {
   name: string;
@@ -69,30 +69,19 @@ export function Order() {
     const newOrderId = `ord_${Math.random().toString(36).substr(2, 9)}`;
     
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          key: `order:${newOrderId}`,
-          value: {
-            id: newOrderId,
-            ...data,
-            userId: user?.id || null,
-            userEmail: user?.email || null,
-            status: "pending",
-            createdAt: new Date().toISOString(),
-            total: 150 + (data.tips || 0) // Basic fixed price for demo
-          }
-        })
+      await dbSet(`order:${newOrderId}`, {
+        id: newOrderId,
+        ...data,
+        userId: user?.id || null,
+        userEmail: user?.email || null,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        total: 150 + (data.tips || 0)
       });
       
       setOrderId(newOrderId);
       setIsSubmitted(true);
       reset();
-      // Optional: Automatically redirect after a delay or let user click
       setTimeout(() => {
         navigate(`/track?id=${newOrderId}`);
       }, 2000);

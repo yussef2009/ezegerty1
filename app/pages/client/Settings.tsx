@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbSet } from "../../lib/db";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -43,11 +43,7 @@ export function ClientSettings() {
         updatedAt: new Date().toISOString()
       };
       
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: `user_profile:${user?.id}`, value: updatedProfile })
-      });
+      await dbSet(`user_profile:${user?.id}`, updatedProfile);
       
       toast.success("Profile updated successfully!");
     } catch (error) {

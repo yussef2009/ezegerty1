@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbSet, dbGetByPrefix } from "../../lib/db";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -42,16 +42,11 @@ export function AdminDashboard() {
   const fetchOrders = async () => {
     setLoadingOrders(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        const sorted = data.values.sort((a: Order, b: Order) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        setOrders(sorted);
-      }
+      const values = await dbGetByPrefix("order:");
+      const sorted = values.sort((a: Order, b: Order) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setOrders(sorted);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {
@@ -70,11 +65,7 @@ export function AdminDashboard() {
     if (!order) return;
     const updatedOrder = { ...order, status: newStatus };
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: `order:${orderId}`, value: updatedOrder })
-      });
+      await dbSet(`order:${orderId}`, updatedOrder);
       setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
     } catch (error) {
       console.error("Error updating status:", error);

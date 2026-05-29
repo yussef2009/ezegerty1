@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGetByPrefix, dbSet } from "../../lib/db";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -25,15 +25,10 @@ export function AdminBusinessRequests() {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/account_request:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        setRequests(data.values.sort((a: AccountRequest, b: AccountRequest) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        ));
-      }
+      const values = await dbGetByPrefix("account_request:");
+      setRequests(values.sort((a: AccountRequest, b: AccountRequest) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ));
     } catch (error) {
       toast.error("Failed to fetch requests");
     } finally {
@@ -50,11 +45,7 @@ export function AdminBusinessRequests() {
     if (!request) return;
     const updatedRequest = { ...request, status: newStatus };
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: `account_request:${requestId}`, value: updatedRequest })
-      });
+      await dbSet(`account_request:${requestId}`, updatedRequest);
       setRequests(requests.map(r => r.id === requestId ? updatedRequest : r));
       toast.success(`Request marked as ${newStatus}`);
     } catch (error) {

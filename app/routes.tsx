@@ -25,6 +25,7 @@ import { ClientDashboard } from "./pages/client/Dashboard";
 import { ClientSettings } from "./pages/client/Settings";
 import { ClientHistory } from "./pages/client/History";
 import { ClientAccountRequest } from "./pages/client/AccountRequest";
+import { DeliveryDashboard } from "./pages/delivery/Dashboard";
 
 function Root() {
   return (
@@ -85,6 +86,7 @@ export const router = createBrowserRouter([
       { path: "client/settings", Component: ClientSettings },
       { path: "client/history", Component: ClientHistory },
       { path: "client/account-request", Component: ClientAccountRequest },
+      { path: "delivery/dashboard", Component: DeliveryDashboard },
       { path: "*", Component: Home },
     ],
   },

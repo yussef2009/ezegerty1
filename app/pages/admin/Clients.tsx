@@ -24,7 +24,7 @@ import {
   DialogDescription,
   DialogFooter
 } from "../../components/ui/dialog";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGet, dbSet } from "../../lib/db";
 
 type Client = {
   id: string;
@@ -49,10 +49,7 @@ export function AdminClients() {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/get/clients_list`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
+      const data = await dbGet("clients_list");
       
       // If no data, provide some mock data for the stakeholder to see
       if (!data || data.length === 0) {
@@ -109,17 +106,7 @@ export function AdminClients() {
 
   const saveClients = async (updatedClients: Client[]) => {
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          key: "clients_list",
-          value: updatedClients
-        })
-      });
+      await dbSet("clients_list", updatedClients);
     } catch (error) {
       console.error("Error saving clients:", error);
     }

@@ -4,7 +4,7 @@ import { Loader2, Package, MapPin, Truck, CheckCircle, Clock } from "lucide-reac
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { motion } from "motion/react";
-import { projectId, publicAnonKey } from "../../supabase/info";
+import { dbGet } from "../lib/db";
 
 type OrderStatus = "pending" | "cleaning" | "ready" | "delivered";
 
@@ -49,10 +49,7 @@ export function TrackingPage() {
   const fetchOrder = async (id: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/get/order:${id}`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
+      const data = await dbGet(`order:${id}`);
       if (data) {
         setOrder(data);
       } else {

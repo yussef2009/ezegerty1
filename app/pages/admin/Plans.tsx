@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Plus, Trash2, X, Sparkles, Loader2 } from "lucide-react";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGet, dbSet } from "../../lib/db";
 import { toast } from "sonner";
 
 type Plan = {
@@ -23,11 +23,8 @@ export function AdminPlans() {
   const fetchPlans = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/get/plans`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.value) setPlans(data.value || []);
+      const data = await dbGet("plans");
+      if (data) setPlans(data || []);
     } catch (error) {
       toast.error("Failed to load plans");
     } finally {
@@ -48,11 +45,7 @@ export function AdminPlans() {
     };
     const updated = [...plans, newItem];
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: "plans", value: updated })
-      });
+      await dbSet("plans", updated);
       setPlans(updated);
       setNewPlan({ name: "", price: "", interval: "monthly", features: "" });
       setIsAdding(false);
@@ -65,11 +58,7 @@ export function AdminPlans() {
   const handleDelete = async (id: string) => {
     const updated = plans.filter(p => p.id !== id);
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: "plans", value: updated })
-      });
+      await dbSet("plans", updated);
       setPlans(updated);
       toast.success("Plan removed");
     } catch (e) {

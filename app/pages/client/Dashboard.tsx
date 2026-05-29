@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGetByPrefix } from "../../lib/db";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Loader2, Package, LogOut, Clock, MapPin, CreditCard } from "lucide-react";
@@ -32,23 +32,16 @@ export function ClientDashboard() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: {
-          "Authorization": `Bearer ${publicAnonKey}`
-        }
-      });
-      const data = await response.json();
-      if (data.values) {
-        // Filter by current user ID or Email
-        const myOrders = data.values.filter((o: Order) => 
-          o.userId === user?.id || o.userEmail === user?.email
-        );
-        
-        const sorted = myOrders.sort((a: Order, b: Order) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        setOrders(sorted);
-      }
+      const values = await dbGetByPrefix("order:");
+      // Filter by current user ID or Email
+      const myOrders = values.filter((o: Order) => 
+        o.userId === user?.id || o.userEmail === user?.email
+      );
+      
+      const sorted = myOrders.sort((a: Order, b: Order) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setOrders(sorted);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {

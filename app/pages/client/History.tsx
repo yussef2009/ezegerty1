@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGetByPrefix } from "../../lib/db";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Loader2, Package, Clock, CreditCard, ChevronRight, Truck } from "lucide-react";
@@ -32,16 +32,11 @@ export function ClientHistory() {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        const myOrders = data.values.filter((o: Order) => 
-          o.userId === user?.id || o.userEmail === user?.email
-        ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setOrders(myOrders);
-      }
+      const values = await dbGetByPrefix("order:");
+      const myOrders = values.filter((o: Order) => 
+        o.userId === user?.id || o.userEmail === user?.email
+      ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setOrders(myOrders);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {

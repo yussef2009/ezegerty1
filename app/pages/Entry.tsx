@@ -13,6 +13,8 @@ export function Entry() {
     if (!loading && user && role) {
       if (role === "admin") {
         navigate("/admin/dashboard");
+      } else if (role === "delivery") {
+        navigate("/delivery/dashboard");
       } else {
         navigate("/client/dashboard");
       }

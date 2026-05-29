@@ -6,7 +6,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { useAuth } from "../../context/AuthContext";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbSet } from "../../lib/db";
 import { Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -22,22 +22,12 @@ export function ClientAccountRequest() {
     const requestId = `req_${Math.random().toString(36).substr(2, 9)}`;
     
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          key: `account_request:${requestId}`,
-          value: {
-            id: requestId,
-            userId: user?.id || 'anonymous',
-            ...data,
-            status: "pending",
-            createdAt: new Date().toISOString(),
-          }
-        })
+      await dbSet(`account_request:${requestId}`, {
+        id: requestId,
+        userId: user?.id || 'anonymous',
+        ...data,
+        status: "pending",
+        createdAt: new Date().toISOString(),
       });
       
       setSubmitted(true);

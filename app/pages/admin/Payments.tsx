@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbGetByPrefix, dbSet } from "../../lib/db";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -23,15 +23,10 @@ export function AdminPayments() {
   const fetchPendingPayments = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        // Find orders where payment is pending
-        const pending = data.values.filter((o: Order) => o.paymentStatus === 'pending' || (o.paymentMethod === 'Instapay' && !o.paymentStatus));
-        setOrders(pending);
-      }
+      const values = await dbGetByPrefix("order:");
+      // Find orders where payment is pending
+      const pending = values.filter((o: Order) => o.paymentStatus === 'pending' || (o.paymentMethod === 'Instapay' && !o.paymentStatus));
+      setOrders(pending);
     } catch (error) {
       toast.error("Failed to load payments");
     } finally {
@@ -48,11 +43,7 @@ export function AdminPayments() {
     if (!order) return;
     const updatedOrder = { ...order, paymentStatus: status };
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: `order:${orderId}`, value: updatedOrder })
-      });
+      await dbSet(`order:${orderId}`, updatedOrder);
       setOrders(orders.filter(o => o.id !== orderId));
       toast.success(`Payment marked as ${status}`);
     } catch (error) {

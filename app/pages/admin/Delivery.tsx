@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { projectId, publicAnonKey } from "../../../supabase/info";
+import { dbSet, dbGetByPrefix } from "../../lib/db";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -36,15 +36,9 @@ export function AdminDelivery() {
   const fetchDeliveryOrders = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/prefix/order:`, {
-        headers: { "Authorization": `Bearer ${publicAnonKey}` }
-      });
-      const data = await response.json();
-      if (data.values) {
-        // Only show orders that are 'ready' (for pickup) or 'delivered' (recently)
-        const deliveryOrders = data.values.filter((o: Order) => o.status === 'ready' || o.status === 'delivered');
-        setOrders(deliveryOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-      }
+      const values = await dbGetByPrefix("order:");
+      const deliveryOrders = values.filter((o: Order) => o.status === 'ready' || o.status === 'delivered');
+      setOrders(deliveryOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
       toast.error("Failed to fetch delivery tasks");
     } finally {
@@ -59,13 +53,9 @@ export function AdminDelivery() {
   const markAsDelivered = async (orderId: string) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    const updatedOrder = { ...order, status: "delivered" };
+    const updatedOrder: Order = { ...order, status: "delivered" };
     try {
-      await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/kv/set`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ key: `order:${orderId}`, value: updatedOrder })
-      });
+      await dbSet(`order:${orderId}`, updatedOrder);
       setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
       toast.success("Order marked as delivered");
     } catch (error) {
@@ -77,23 +67,19 @@ export function AdminDelivery() {
     e.preventDefault();
     setIsAddingDriver(true);
     try {
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-97c3633e/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${publicAnonKey}` },
-        body: JSON.stringify({ 
-          email: driverForm.email, 
-          password: driverForm.password,
-          name: driverForm.name,
-          role: "delivery"
-        })
+      const driverId = `driver_${Date.now()}`;
+      await dbSet(`driver:${driverId}`, {
+        id: driverId,
+        name: driverForm.name,
+        email: driverForm.email,
+        role: "delivery",
+        createdAt: new Date().toISOString()
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      toast.success("Delivery driver account created successfully");
+      toast.success("Delivery driver added successfully");
       setIsDialogOpen(false);
       setDriverForm({ name: "", email: "", password: "" });
     } catch (error: any) {
-      toast.error(error.message || "Failed to create driver");
+      toast.error(error.message || "Failed to add driver");
     } finally {
       setIsAddingDriver(false);
     }
