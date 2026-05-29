@@ -76,10 +76,10 @@ export function DeliveryDashboard() {
     };
   }, [orders]);
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    const updatedOrder = { ...order, status: newStatus };
+    const updatedOrder: Order = { ...order, status: newStatus };
     try {
       await dbSet(`order:${orderId}`, updatedOrder);
       setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
