@@ -1,9 +1,23 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { User, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 const logo = "/logo.png";
 
 export function Entry() {
+  const { user, role, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user && role) {
+      if (role === "admin") {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/client/dashboard");
+      }
+    }
+  }, [user, role, loading, navigate]);
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 dark:bg-gray-950">
       <motion.div

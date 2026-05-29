@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { Button } from "../../components/ui/button";
@@ -9,11 +9,21 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export function AdminLogin() {
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, user, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors } } = useForm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (role === "admin") {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/client/dashboard");
+      }
+    }
+  }, [user, role, authLoading, navigate]);
 
   const onSubmit = async (data: any) => {
     setLoading(true);
