@@ -17,10 +17,11 @@ export function AdminLogin() {
 
   useEffect(() => {
     if (!authLoading && user && role) {
+      // Check if user is an admin or delivery person
       if (role === "admin" || role === "delivery") {
         navigate("/admin/dashboard");
       } else {
-        // role is a non-null, non-admin role — redirect to client area
+        // If user has a non-admin role, they belong in client area
         navigate("/client/dashboard");
       }
     }

@@ -67,16 +67,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let currentRole = currentUser?.user_metadata?.role ?? null;
 
       // When a Google OAuth user signs in and has no role assigned yet,
-      // read the intended role from localStorage and sync it to their metadata.
+      // read the intended role from sessionStorage and sync it to their metadata.
       if (_event === "SIGNED_IN" && currentUser && !currentRole) {
-        const pendingRole = localStorage.getItem("oauth_pending_role") ?? "client";
+        const pendingRole = sessionStorage.getItem("oauth_pending_role") ?? "client";
         const pendingName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split("@")[0] || "User";
-        localStorage.removeItem("oauth_pending_role");
+        sessionStorage.removeItem("oauth_pending_role");
 
         // Persist the role and name into Supabase user metadata
-        await supabase.auth.updateUser({
-          data: { role: pendingRole, name: pendingName },
-        });
+        try {
+          await supabase.auth.updateUser({
+            data: { role: pendingRole, name: pendingName },
+          });
+        } catch (error) {
+          console.error("Error updating user role:", error);
+        }
 
         currentRole = pendingRole;
       }
@@ -98,14 +102,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signInWithGoogle = async (redirectTo?: string, role: string = "client") => {
-    // Store the intended role before leaving the page for OAuth
-    localStorage.setItem("oauth_pending_role", role);
+  // Get the correct origin: use VITE_SITE_URL in production, window.location.origin in dev
+  function getOrigin(): string {
+    if (import.meta.env.VITE_SITE_URL) {
+      return import.meta.env.VITE_SITE_URL;
+    }
+    return typeof window !== "undefined" ? window.location.origin : "http://localhost:5173";
+  }
 
+  const signInWithGoogle = async (redirectTo?: string, role: string = "client") => {
+    // Store the intended role in sessionStorage before redirecting to OAuth
+    // Using sessionStorage because it persists across navigation but only for this session/tab
+    sessionStorage.setItem("oauth_pending_role", role);
+
+    const origin = getOrigin();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectTo ? `${window.location.origin}${redirectTo}` : `${window.location.origin}/client/dashboard`
+        redirectTo: redirectTo ? `${origin}${redirectTo}` : `${origin}/client/dashboard`
       }
     });
     return { error };
