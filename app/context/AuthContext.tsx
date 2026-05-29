@@ -79,11 +79,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  // Get the correct origin: use VITE_SITE_URL in production, window.location.origin in dev
+  function getOrigin(): string {
+    if (import.meta.env.VITE_SITE_URL) {
+      return import.meta.env.VITE_SITE_URL;
+    }
+    return typeof window !== "undefined" ? window.location.origin : "http://localhost:5173";
+  }
+
   const signInWithGoogle = async (redirectTo?: string) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectTo ? `${window.location.origin}${redirectTo}` : `${window.location.origin}/client/dashboard`
+        redirectTo: redirectTo ? `${getOrigin()}${redirectTo}` : `${getOrigin()}/client/dashboard`
       }
     });
     return { error };

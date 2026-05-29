@@ -7,17 +7,19 @@
         {
             "type": "msedge",
             "request": "launch",
-            "name": "Open Edge (Vercel)",
-            "url": "https://ezegerty1.vercel.app/",
+            "name": "Launch Edge (Vite)",
+            "url": "http://127.0.0.1:5173/",
             "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "Start Dev Server",
             "userDataDir": false
         },
         {
             "type": "chrome",
             "request": "launch",
-            "name": "Open Chrome (Vercel)",
-            "url": "https://ezegerty1.vercel.app/",
+            "name": "Launch Chrome (Vite)",
+            "url": "http://127.0.0.1:5173/",
             "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "Start Dev Server",
             "userDataDir": false
         }
     ]
