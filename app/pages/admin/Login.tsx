@@ -38,8 +38,9 @@ export function AdminLogin() {
     const { error } = await signIn(data.email, data.password);
     if (error) {
       setError(error.message);
+      setLoading(false);
     }
-    setLoading(false);
+    // On success, keep loading until useEffect navigates or shows access denied
   };
 
   return (

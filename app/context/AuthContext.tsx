@@ -12,7 +12,32 @@ const supabase = createClient(
 const devAutoLogin = import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1";
 
 export const AUTH_PORTAL_KEY = "auth_portal";
-export const OAUTH_PENDING_ROLE_KEY = "oauth_pending_role";
+/** JSON: { role: string, portal: "admin" | "client" } — portal that started OAuth */
+export const OAUTH_PENDING_KEY = "oauth_pending";
+
+type OAuthPending = { role: string; portal: "admin" | "client" };
+
+function getOAuthPending(): OAuthPending | null {
+  const raw = sessionStorage.getItem(OAUTH_PENDING_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as OAuthPending;
+    if (parsed?.role && (parsed.portal === "admin" || parsed.portal === "client")) {
+      return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function setOAuthPending(role: string, portal: "admin" | "client") {
+  sessionStorage.setItem(OAUTH_PENDING_KEY, JSON.stringify({ role, portal }));
+}
+
+function clearOAuthPending() {
+  sessionStorage.removeItem(OAUTH_PENDING_KEY);
+}
 
 function getAdminEmails(): string[] {
   const raw = import.meta.env.VITE_ADMIN_EMAILS as string | undefined;
@@ -25,7 +50,7 @@ function isAdminEmail(email: string | undefined): boolean {
   return getAdminEmails().includes(email.toLowerCase());
 }
 
-/** OAuth pending role is only honored when it matches the active login portal. */
+/** OAuth pending role is only honored when it matches the portal that started OAuth. */
 function getPendingRoleForPortal(
   portal: string | null,
   pendingRole: string | null
@@ -58,10 +83,17 @@ function resolveRoleForPortal(
   return currentRole;
 }
 
-/** Call when entering a login page — clears stale OAuth role from an abandoned flow. */
+/**
+ * Call when entering a login page.
+ * Clears OAuth intent only if it was started on this same portal (abandoned flow).
+ * Preserves cross-portal OAuth intent so a late callback still gets the correct role.
+ */
 export function prepareAuthPortal(portal: "admin" | "client") {
   sessionStorage.setItem(AUTH_PORTAL_KEY, portal);
-  sessionStorage.removeItem(OAUTH_PENDING_ROLE_KEY);
+  const pending = getOAuthPending();
+  if (pending?.portal === portal) {
+    clearOAuthPending();
+  }
 }
 
 type AuthContextType = {
@@ -120,8 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let currentRole = currentUser?.user_metadata?.role ?? null;
 
       if (_event === "SIGNED_IN" && currentUser) {
-        const portal = sessionStorage.getItem(AUTH_PORTAL_KEY);
-        const rawPendingRole = sessionStorage.getItem(OAUTH_PENDING_ROLE_KEY);
+        const oauthPending = getOAuthPending();
+        const portal = oauthPending?.portal ?? sessionStorage.getItem(AUTH_PORTAL_KEY);
+        const rawPendingRole = oauthPending?.role ?? null;
         const pendingRole = getPendingRoleForPortal(portal, rawPendingRole);
         const targetRole = resolveRoleForPortal(
           currentRole,
@@ -135,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           currentUser.email?.split("@")[0] ||
           "User";
 
-        sessionStorage.removeItem(OAUTH_PENDING_ROLE_KEY);
+        clearOAuthPending();
 
         if (targetRole && targetRole !== currentRole) {
           try {
@@ -179,8 +212,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Password sign-in must not reuse a stale OAuth role from another portal
-    sessionStorage.removeItem(OAUTH_PENDING_ROLE_KEY);
+    const portal = sessionStorage.getItem(AUTH_PORTAL_KEY) as "admin" | "client" | null;
+    const pending = getOAuthPending();
+    if (pending && portal && pending.portal === portal) {
+      clearOAuthPending();
+    }
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -188,7 +224,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!error && data.user) {
-      const portal = sessionStorage.getItem(AUTH_PORTAL_KEY);
       const currentRole = data.user.user_metadata?.role ?? null;
       const targetRole = resolveRoleForPortal(
         currentRole,
@@ -221,7 +256,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  // Get the correct origin: use VITE_SITE_URL in production, window.location.origin in dev
   function getOrigin(): string {
     if (import.meta.env.VITE_SITE_URL) {
       return import.meta.env.VITE_SITE_URL;
@@ -230,16 +264,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signInWithGoogle = async (redirectTo?: string, role: string = "client") => {
-    // Store the intended role in sessionStorage before redirecting to OAuth
-    // Using sessionStorage because it persists across navigation but only for this session/tab
-    sessionStorage.setItem(OAUTH_PENDING_ROLE_KEY, role);
+    const portal =
+      (sessionStorage.getItem(AUTH_PORTAL_KEY) as "admin" | "client" | null) ?? "client";
+    setOAuthPending(role, portal);
 
     const origin = getOrigin();
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
-        redirectTo: redirectTo ? `${origin}${redirectTo}` : `${origin}/client/dashboard`
-      }
+        redirectTo: redirectTo ? `${origin}${redirectTo}` : `${origin}/client/dashboard`,
+      },
     });
     return { error };
   };
