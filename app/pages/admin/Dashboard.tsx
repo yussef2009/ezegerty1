@@ -9,19 +9,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Loader2, RefreshCw, Check, X, TrendingUp, Users, ShoppingBag, Landmark, WashingMachine, Sparkles, Tag } from "lucide-react";
 
-type Order = {
+interface OrderRecord {
   id: string;
   name: string;
   phone: string;
   address: string;
-  status: "pending" | "cleaning" | "ready" | "delivered";
+  status: string;
   paymentMethod: string;
+  paymentStatus?: string;
   tips: number;
   total: number;
   createdAt: string;
-};
+}
 
-type AccountRequest = {
+interface AccountRequest {
   id: string;
   companyName: string;
   contactPerson: string;
@@ -31,24 +32,63 @@ type AccountRequest = {
   notes: string;
   status: "pending" | "approved" | "rejected";
   createdAt: string;
+}
+
+const VALID_STATUSES = ["pending", "cleaning", "ready", "delivered"] as const;
+type ValidStatus = typeof VALID_STATUSES[number];
+
+const isValidStatus = (status: unknown): status is ValidStatus => {
+  return typeof status === "string" && VALID_STATUSES.includes(status as ValidStatus);
+};
+
+const normalizeOrder = (data: unknown): OrderRecord | null => {
+  if (!data || typeof data !== "object") return null;
+  
+  const obj = data as Record<string, unknown>;
+  
+  return {
+    id: String(obj.id || "").substring(0, 100),
+    name: String(obj.name || "").substring(0, 100),
+    phone: String(obj.phone || "").substring(0, 20),
+    address: String(obj.address || "").substring(0, 200),
+    status: isValidStatus(obj.status) ? obj.status : "pending",
+    paymentMethod: String(obj.paymentMethod || "").toLowerCase(),
+    paymentStatus: obj.paymentStatus ? String(obj.paymentStatus).toLowerCase() : undefined,
+    tips: typeof obj.tips === "number" ? Math.max(0, obj.tips) : 0,
+    total: typeof obj.total === "number" ? Math.max(0, obj.total) : 0,
+    createdAt: String(obj.createdAt || new Date().toISOString())
+  };
 };
 
 export function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
   const fetchOrders = async () => {
     setLoadingOrders(true);
     try {
       const values = await dbGetByPrefix("order:");
-      const sorted = values.sort((a: Order, b: Order) =>
+      const normalized: OrderRecord[] = [];
+      
+      if (Array.isArray(values)) {
+        for (const item of values) {
+          const normalized_item = normalizeOrder(item);
+          if (normalized_item) {
+            normalized.push(normalized_item);
+          }
+        }
+      }
+      
+      const sorted = normalized.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+      
       setOrders(sorted);
     } catch (error) {
       console.error("Error fetching orders:", error);
+      setOrders([]);
     } finally {
       setLoadingOrders(false);
     }
@@ -62,11 +102,15 @@ export function AdminDashboard() {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
-    if (!order) return;
+    if (!order || !isValidStatus(newStatus)) return;
+    
     const updatedOrder = { ...order, status: newStatus };
+    
     try {
       await dbSet(`order:${orderId}`, updatedOrder);
-      setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
+      setOrders(prev => prev.map(o => 
+        o.id === orderId ? updatedOrder : o
+      ));
     } catch (error) {
       console.error("Error updating status:", error);
     }
@@ -75,6 +119,9 @@ export function AdminDashboard() {
   const totalRevenue = orders.reduce((acc, curr) => acc + (curr.total || 0), 0);
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
   const recentOrders = orders.slice(0, 5);
+  const instapayPending = orders.filter(o => 
+    o.paymentMethod === 'instapay' && (!o.paymentStatus || o.paymentStatus === 'pending')
+  ).length;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -128,7 +175,7 @@ export function AdminDashboard() {
             <div className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-xl"><Landmark className="h-6 w-6" /></div>
             <div>
               <p className="text-sm font-medium text-gray-500">Instapay Pending</p>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{orders.filter(o => o.paymentMethod === 'instapay' && o.paymentStatus === 'pending').length}</h3>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{instapayPending}</h3>
             </div>
           </div>
         </div>
@@ -168,7 +215,7 @@ export function AdminDashboard() {
                         order.status === 'ready' ? 'secondary' : 
                         order.status === 'cleaning' ? 'outline' : 'destructive'
                       } className="px-2 py-0.5 rounded-md">
-                        {order.status.toUpperCase()}
+                        {String(order.status).toUpperCase()}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-bold text-gray-900 dark:text-white">{order.total} EGP</TableCell>
@@ -210,22 +257,6 @@ export function AdminDashboard() {
               >
                 <WashingMachine className="h-5 w-5 text-gray-400" />
                 <span>Add New Service</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start h-12 gap-3 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
-                onClick={() => navigate("/admin/plans")}
-              >
-                <Sparkles className="h-5 w-5 text-gray-400" />
-                <span>Create Subscription Plan</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start h-12 gap-3 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
-                onClick={() => navigate("/admin/discounts")}
-              >
-                <Tag className="h-5 w-5 text-gray-400" />
-                <span>Generate Promo Code</span>
               </Button>
             </div>
           </div>
