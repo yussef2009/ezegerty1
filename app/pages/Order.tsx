@@ -1,16 +1,32 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { motion } from "motion/react";
-import { CheckCircle, Copy, Loader2, Info } from "lucide-react";
+import { CheckCircle, Loader2, Info, Trash2, Plus } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
-import { dbSet } from "../lib/db";
+import { dbSet, dbGet } from "../lib/db";
+
+type Service = {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+};
+
+type OrderItem = {
+  serviceId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  isOther: boolean;
+  otherDescription?: string;
+};
 
 type OrderFormData = {
   name: string;
@@ -35,9 +51,17 @@ export function Order() {
       tips: 0
     }
   });
+  
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [selectedService, setSelectedService] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [otherDescription, setOtherDescription] = useState("");
+  const [instapayNumber, setInstapayNumber] = useState("");
+  const [servicesLoading, setServicesLoading] = useState(true);
   
   // Pre-fill user data if logged in
   useEffect(() => {
@@ -47,41 +71,111 @@ export function Order() {
     }
   }, [user, setValue]);
 
+  // Fetch services and Instapay number from DB
+  useEffect(() => {
+    const fetchData = async () => {
+      setServicesLoading(true);
+      try {
+        const servicesData = await dbGet("services");
+        if (servicesData && Array.isArray(servicesData)) {
+          setServices(servicesData);
+        }
+        
+        const instapay = await dbGet("instapay_account");
+        if (instapay?.number) {
+          setInstapayNumber(instapay.number);
+        } else {
+          // Fallback if not configured
+          setInstapayNumber("01000000000");
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
+
   const paymentMethod = useWatch({
     control,
     name: "paymentMethod",
   });
 
-  const instapayNumber = useMemo(() => {
-    const prefixes = ['010', '011', '012', '015'];
-    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
-    return `${prefix} ${suffix.slice(0, 4)} ${suffix.slice(4)}`;
-  }, []);
+  const totalOrderAmount = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(instapayNumber.replace(/\s/g, ''));
-    alert("Number copied to clipboard!");
+  const addItem = () => {
+    if (!selectedService) return;
+    
+    let newItem: OrderItem;
+    if (selectedService === "other") {
+      if (!otherDescription.trim()) {
+        alert("Please describe what you need");
+        return;
+      }
+      newItem = {
+        serviceId: "other",
+        name: t.order.other,
+        quantity: 1,
+        price: 0,
+        isOther: true,
+        otherDescription: otherDescription
+      };
+    } else {
+      const service = services.find(s => s.id === selectedService);
+      if (!service) return;
+      
+      newItem = {
+        serviceId: service.id,
+        name: service.name,
+        quantity: parseInt(String(quantity)),
+        price: service.price,
+        isOther: false
+      };
+    }
+    
+    setOrderItems([...orderItems, newItem]);
+    setSelectedService("");
+    setQuantity(1);
+    setOtherDescription("");
+  };
+
+  const removeItem = (index: number) => {
+    setOrderItems(orderItems.filter((_, i) => i !== index));
   };
 
   const onSubmit = async (data: OrderFormData) => {
+    if (orderItems.length === 0) {
+      alert("Please add at least one service to your order");
+      return;
+    }
+
     setLoading(true);
     const newOrderId = `ord_${Math.random().toString(36).substr(2, 9)}`;
     
     try {
-      await dbSet(`order:${newOrderId}`, {
+      const orderData: any = {
         id: newOrderId,
         ...data,
         userId: user?.id || null,
         userEmail: user?.email || null,
         status: "pending",
         createdAt: new Date().toISOString(),
-        total: 150 + (data.tips || 0)
-      });
+        items: orderItems,
+        total: totalOrderAmount + (data.tips || 0),
+        paymentStatus: data.paymentMethod === "instapay" ? "pending" : "confirmed",
+        paymentMethod: data.paymentMethod.toLowerCase(),
+        priceByAdmin: orderItems.some(item => item.isOther),
+        instapayNumber: data.paymentMethod === "instapay" ? instapayNumber : null
+      };
+      
+      await dbSet(`order:${newOrderId}`, orderData);
       
       setOrderId(newOrderId);
       setIsSubmitted(true);
       reset();
+      setOrderItems([]);
       setTimeout(() => {
         navigate(`/track?id=${newOrderId}`);
       }, 2000);
@@ -138,6 +232,109 @@ export function Order() {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Service Selection */}
+            <div className="space-y-4 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-white">{t.order.orderItems}</h3>
+              
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium dark:text-white">{t.order.selectService}</label>
+                  <select
+                    value={selectedService}
+                    onChange={(e) => setSelectedService(e.target.value)}
+                    className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white"
+                    disabled={servicesLoading}
+                  >
+                    <option value="">{t.order.selectServicePlaceholder}</option>
+                    {services.map(service => (
+                      <option key={service.id} value={service.id}>
+                        {service.name} - {service.price} EGP
+                      </option>
+                    ))}
+                    <option value="other">{t.order.other}</option>
+                  </select>
+                </div>
+
+                {selectedService && selectedService !== "other" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium dark:text-white">{t.order.pieces}</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                      className="dark:bg-gray-900 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {selectedService === "other" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium dark:text-white">{t.order.otherDescription}</label>
+                    <Textarea
+                      placeholder={String(t.order.otherDescPlaceholder)}
+                      value={otherDescription}
+                      onChange={(e) => setOtherDescription(e.target.value)}
+                      className="dark:bg-gray-900 dark:border-gray-600 dark:text-white"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{t.order.priceByAdmin}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={addItem}
+                  variant="outline"
+                  className="w-full gap-2"
+                  disabled={!selectedService}
+                >
+                  <Plus className="h-4 w-4" /> {t.order.addItem}
+                </Button>
+              </div>
+
+              {/* Order Items List */}
+              {orderItems.length > 0 && (
+                <div className="mt-4 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-4">
+                  {orderItems.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                        {!item.isOther && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {item.quantity} × {item.price} EGP = {item.quantity * item.price} EGP
+                          </p>
+                        )}
+                        {item.isOther && (
+                          <>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{item.otherDescription}</p>
+                            <p className="text-xs text-orange-600 dark:text-orange-400">{t.order.priceByAdmin}</p>
+                          </>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeItem(index)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  {/* Total */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-200 dark:border-blue-800 mt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-900 dark:text-white">{t.order.orderTotal}</span>
+                      <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{totalOrderAmount} EGP</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Customer Information */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-white">{t.order.name}</label>
@@ -234,15 +431,6 @@ export function Order() {
                   </p>
                   <div className="flex items-center justify-between rounded-md bg-white p-3 dark:bg-gray-800">
                     <code className="text-lg font-mono font-bold text-gray-800 dark:text-white">{instapayNumber}</code>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={copyToClipboard}
-                      className="text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
 

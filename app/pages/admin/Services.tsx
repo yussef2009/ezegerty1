@@ -10,6 +10,7 @@ type Service = {
   name: string;
   price: number;
   description: string;
+  category?: string;
 };
 
 export function AdminServices() {
@@ -17,7 +18,7 @@ export function AdminServices() {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newService, setNewService] = useState({ name: "", price: "", description: "" });
+  const [newService, setNewService] = useState({ name: "", price: "", description: "", category: "Delivery" });
   const [editForm, setEditForm] = useState<Service | null>(null);
 
   const fetchServices = async () => {
@@ -51,11 +52,12 @@ export function AdminServices() {
       id: Math.random().toString(36).substr(2, 9),
       name: newService.name,
       price: parseFloat(newService.price),
-      description: newService.description
+      description: newService.description,
+      category: newService.category || "Delivery"
     };
     const updated = [...services, newItem];
     await saveServices(updated);
-    setNewService({ name: "", price: "", description: "" });
+    setNewService({ name: "", price: "", description: "", category: "Delivery" });
     setIsAdding(false);
   };
 
@@ -94,6 +96,18 @@ export function AdminServices() {
               value={newService.name} 
               onChange={e => setNewService({...newService, name: e.target.value})}
             />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Category</label>
+            <select 
+              className="w-full h-12 px-3 rounded-md border border-input bg-background dark:bg-gray-800 dark:border-gray-700"
+              value={newService.category} 
+              onChange={e => setNewService({...newService, category: e.target.value})}
+            >
+              <option value="Delivery">Delivery</option>
+              <option value="In-Store Service">In-Store Service</option>
+              <option value="Pickup">Pickup</option>
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Base Price (EGP)</label>
@@ -139,6 +153,7 @@ export function AdminServices() {
           <TableHeader>
             <TableRow className="bg-gray-50/50 dark:bg-gray-800/50">
               <TableHead className="py-4">Service Name</TableHead>
+              <TableHead>Category</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -146,21 +161,38 @@ export function AdminServices() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-12"><Loader2 className="animate-spin inline h-8 w-8 text-blue-600" /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center py-12"><Loader2 className="animate-spin inline h-8 w-8 text-blue-600" /></TableCell></TableRow>
             ) : services.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-20">
+                <TableCell colSpan={5} className="text-center py-20">
                   <WashingMachine className="mx-auto h-12 w-12 text-gray-400 mb-4 opacity-20" />
                   <p className="text-gray-500 font-medium">No services defined yet.</p>
                 </TableCell>
               </TableRow>
             ) : (
               services.map(service => (
-                <TableRow key={service.id} className="hover:bg-gray-50/30 dark:hover:bg-gray-800/30">
+                <TableRow key={service.id} className="hover:bg-gray-50/30 dark:hover:bg-gray-800/30 group">
                   <TableCell className="font-semibold py-4">
                     {editingId === service.id && editForm ? (
                       <Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="h-9" />
                     ) : service.name}
+                  </TableCell>
+                  <TableCell>
+                    {editingId === service.id && editForm ? (
+                      <select 
+                        className="w-full h-9 px-2 rounded-md border border-input bg-background dark:bg-gray-800 dark:border-gray-700 text-sm"
+                        value={editForm.category || "Delivery"}
+                        onChange={e => setEditForm({...editForm, category: e.target.value})}
+                      >
+                        <option value="Delivery">Delivery</option>
+                        <option value="In-Store Service">In-Store Service</option>
+                        <option value="Pickup">Pickup</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded">
+                        {service.category || "Delivery"}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono font-bold text-blue-600 dark:text-blue-400">
                     {editingId === service.id && editForm ? (
@@ -186,10 +218,6 @@ export function AdminServices() {
                     )}
                   </TableCell>
                 </TableRow>
-              )).map((row, i) => (
-                <tr key={services[i].id} className="group transition-colors border-b last:border-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                  {row.props.children}
-                </tr>
               ))
             )}
           </TableBody>

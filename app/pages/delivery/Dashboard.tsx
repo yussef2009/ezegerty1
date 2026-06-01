@@ -4,8 +4,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Loader2, MapPin, Phone, User, Package, Truck, Clock } from "lucide-react";
+import { Loader2, MapPin, Phone, User, Package, Truck, Clock, Map, AlertCircle, CheckCircle2, CircleOff } from "lucide-react";
 import { motion } from "motion/react";
+import { useLanguage } from "../../context/LanguageContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 
 type Order = {
   id: string;
@@ -20,9 +22,20 @@ type Order = {
   pickupTime: string;
 };
 
+type GPSLocation = {
+  lat: number;
+  lng: number;
+  timestamp: string;
+};
+
 export function DeliveryDashboard() {
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [gpsEnabled, setGpsEnabled] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState<"disconnected" | "connected" | "denied">("disconnected");
+  const [currentLocation, setCurrentLocation] = useState<GPSLocation | null>(null);
+  const [watchId, setWatchId] = useState<number | null>(null);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -88,6 +101,49 @@ export function DeliveryDashboard() {
     }
   };
 
+  const toggleGPS = () => {
+    if (gpsEnabled) {
+      // Stop GPS
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        setWatchId(null);
+      }
+      setGpsEnabled(false);
+      setGpsStatus("disconnected");
+    } else {
+      // Start GPS
+      if (!navigator.geolocation) {
+        setGpsStatus("denied");
+        return;
+      }
+
+      const newWatchId = navigator.geolocation.watchPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const location: GPSLocation = {
+            lat: latitude,
+            lng: longitude,
+            timestamp: new Date().toISOString()
+          };
+          setCurrentLocation(location);
+          setGpsStatus("connected");
+          // Store in DB for tracking
+          await dbSet("driver_current_location", location);
+        },
+        (error) => {
+          console.error("Error watching position:", error);
+          if (error.code === error.PERMISSION_DENIED) {
+            setGpsStatus("denied");
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+      );
+
+      setWatchId(newWatchId as unknown as number);
+      setGpsEnabled(true);
+    }
+  };
+
   const activeDeliveries = orders.filter(o => o.status === 'ready' || o.status === 'delivering').length;
 
   return (
@@ -106,7 +162,103 @@ export function DeliveryDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6">
+      <Tabs defaultValue="orders" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="my-location">
+            <MapPin className="h-4 w-4 mr-2" />
+            My Location
+          </TabsTrigger>
+          <TabsTrigger value="orders">
+            <Package className="h-4 w-4 mr-2" />
+            Orders
+          </TabsTrigger>
+        </TabsList>
+
+        {/* My Location Tab */}
+        <TabsContent value="my-location" className="space-y-6 mt-6">
+          <div className="rounded-xl border bg-white p-6 dark:bg-gray-900 dark:border-gray-800 space-y-6">
+            {/* GPS Status Card */}
+            <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Map className="h-5 w-5" />
+                  {t.delivery?.myLocation || "My Location"}
+                </h3>
+                <div className="flex items-center gap-2">
+                  {gpsStatus === "connected" && (
+                    <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="text-xs font-medium">{t.delivery?.gpsConnected || "Connected"}</span>
+                    </div>
+                  )}
+                  {gpsStatus === "disconnected" && (
+                    <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                      <CircleOff className="h-4 w-4" />
+                      <span className="text-xs font-medium">{t.delivery?.gpsDisconnected || "Disconnected"}</span>
+                    </div>
+                  )}
+                  {gpsStatus === "denied" && (
+                    <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-xs font-medium">{t.delivery?.gpsDenied || "Permission Denied"}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                onClick={toggleGPS}
+                className={gpsEnabled ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}
+                size="lg"
+                disabled={gpsStatus === "denied"}
+              >
+                {gpsEnabled ? `${t.delivery?.disableLocation || "Disable GPS Tracking"}` : `${t.delivery?.enableLocation || "Enable GPS Tracking"}`}
+              </Button>
+            </div>
+
+            {/* Current Location Display */}
+            {currentLocation && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-4">{t.delivery?.currentLocation || "Current Location"}</h4>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t.delivery?.latitude || "Latitude"}</p>
+                    <p className="font-mono font-bold text-gray-900 dark:text-white">{currentLocation.lat.toFixed(6)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t.delivery?.longitude || "Longitude"}</p>
+                    <p className="font-mono font-bold text-gray-900 dark:text-white">{currentLocation.lng.toFixed(6)}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t.delivery?.lastUpdated || "Last Updated"}: {new Date(currentLocation.timestamp).toLocaleTimeString()}
+                </p>
+              </motion.div>
+            )}
+
+            {/* Map Embed */}
+            {currentLocation && (
+              <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 h-96">
+                <iframe
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${currentLocation.lng - 0.01},${currentLocation.lat - 0.01},${currentLocation.lng + 0.01},${currentLocation.lat + 0.01}&layer=mapnik&marker=${currentLocation.lat},${currentLocation.lng}`}
+                  style={{ border: 0 }}
+                  allowFullScreen={false}
+                  loading="lazy"
+                />
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Orders Tab */}
+        <TabsContent value="orders" className="space-y-6 mt-6">
         {loading ? (
           <div className="flex h-64 items-center justify-center rounded-xl border border-dashed dark:border-gray-800">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -181,7 +333,8 @@ export function DeliveryDashboard() {
              <p className="text-gray-500 font-medium">No orders ready for delivery.</p>
           </div>
         )}
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

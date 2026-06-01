@@ -128,7 +128,7 @@ export function AdminDashboard() {
             <div className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-xl"><Landmark className="h-6 w-6" /></div>
             <div>
               <p className="text-sm font-medium text-gray-500">Instapay Pending</p>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{orders.filter(o => o.paymentMethod === 'Instapay' && o.status === 'pending').length}</h3>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{orders.filter(o => o.paymentMethod === 'instapay' && o.paymentStatus === 'pending').length}</h3>
             </div>
           </div>
         </div>

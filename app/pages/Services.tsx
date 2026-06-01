@@ -2,54 +2,105 @@ import { Shirt, Briefcase, Scissors, SprayCan, Sofa, ShoppingBag, Zap } from "lu
 import { Link } from "react-router";
 import { Button } from "../components/ui/button";
 import { useLanguage } from "../context/LanguageContext";
+import { useState, useEffect } from "react";
+import { dbGet } from "../lib/db";
+
+type Service = {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+};
 
 export function Services() {
   const { t } = useLanguage();
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const services = [
+  // Default hardcoded services
+  const defaultServices = [
     {
+      id: "dry-clean",
       title: t.servicesPage.dryClean,
       description: t.servicesPage.dryCleanDesc,
       icon: <Briefcase className="h-8 w-8 text-blue-500" />,
       price: `${t.servicesPage.priceStart} 50 EGP`,
     },
     {
+      id: "laundry",
       title: t.servicesPage.laundry,
       description: t.servicesPage.laundryDesc,
       icon: <ShoppingBag className="h-8 w-8 text-blue-500" />,
       price: `${t.servicesPage.priceStart} 30 EGP / kg`,
     },
     {
+      id: "fast-clean",
       title: t.servicesPage.fastClean,
       description: t.servicesPage.fastCleanDesc,
       icon: <Zap className="h-8 w-8 text-yellow-500" />,
-      price: `${t.servicesPage.priceStart} 100 EGP`, // More expensive
+      price: `${t.servicesPage.priceStart} 100 EGP`,
     },
     {
+      id: "ironing",
       title: t.servicesPage.ironing,
       description: t.servicesPage.ironingDesc,
       icon: <Shirt className="h-8 w-8 text-blue-500" />,
       price: `${t.servicesPage.priceStart} 20 EGP`,
     },
     {
+      id: "household",
       title: t.servicesPage.household,
       description: t.servicesPage.householdDesc,
       icon: <Sofa className="h-8 w-8 text-blue-500" />,
       price: t.servicesPage.contactQuote,
     },
     {
+      id: "alterations",
       title: t.servicesPage.alterations,
       description: t.servicesPage.alterationsDesc,
       icon: <Scissors className="h-8 w-8 text-blue-500" />,
       price: t.servicesPage.complexity,
     },
     {
+      id: "shoes",
       title: t.servicesPage.shoes,
       description: t.servicesPage.shoesDesc,
       icon: <SprayCan className="h-8 w-8 text-blue-500" />,
       price: `${t.servicesPage.priceStart} 100 EGP`,
     },
   ];
+
+  // Fetch dynamic services from DB
+  useEffect(() => {
+    const fetchServices = async () => {
+      setLoading(true);
+      try {
+        const data = await dbGet("services");
+        if (data && Array.isArray(data) && data.length > 0) {
+          setServices(data);
+        } else {
+          // No DB services, use defaults
+          setServices([]);
+        }
+      } catch (error) {
+        console.error("Error fetching services:", error);
+        setServices([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServices();
+  }, []);
+
+  // Use DB services if available, otherwise use hardcoded defaults
+  const displayServices = services.length > 0 ? services.map(s => ({
+    id: s.id,
+    title: s.name,
+    description: s.description || "",
+    icon: <Briefcase className="h-8 w-8 text-blue-500" />,
+    price: `${s.price} EGP`,
+  })) : defaultServices;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 dark:bg-gray-950 transition-colors duration-300">
@@ -62,9 +113,9 @@ export function Services() {
         </div>
 
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {services.map((service, index) => (
+          {displayServices.map((service) => (
             <div
-              key={index}
+              key={service.id}
               className="flex flex-col rounded-xl border bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900 dark:border-gray-800"
             >
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/20">

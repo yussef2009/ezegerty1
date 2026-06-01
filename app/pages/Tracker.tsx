@@ -19,6 +19,7 @@ export function Tracker() {
   const [searchParams] = useSearchParams();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -39,10 +40,31 @@ export function Tracker() {
       }
     };
 
+    // Initial fetch
     fetchLocation();
-    const interval = setInterval(fetchLocation, 5000);
+    // Auto-refresh every 3 seconds
+    const interval = setInterval(fetchLocation, 3000);
     return () => clearInterval(interval);
   }, [order]);
+
+  // Auto-refresh order status every 5 seconds
+  useEffect(() => {
+    if (!order) return;
+
+    const refreshOrder = async () => {
+      try {
+        const updatedOrder = await dbGet(`order:${order.id}`);
+        if (updatedOrder) {
+          setOrder(updatedOrder);
+        }
+      } catch (err) {
+        console.error("Error auto-refreshing order:", err);
+      }
+    };
+
+    const interval = setInterval(refreshOrder, 5000);
+    return () => clearInterval(interval);
+  }, [order?.id]);
 
 
   const fetchOrder = async (id: string) => {
@@ -94,6 +116,16 @@ export function Tracker() {
     fetchOrder(data.orderId);
   };
 
+  const handleManualRefresh = async () => {
+    if (!order) return;
+    setRefreshing(true);
+    try {
+      await fetchOrder(order.id);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const steps = [
     { status: "pending", label: "Order Received", icon: Clock },
     { status: "cleaning", label: "Cleaning in Progress", icon: Package },
@@ -127,6 +159,18 @@ export function Tracker() {
                 <Button type="submit" disabled={loading}>
                   {loading ? "Searching..." : <Search className="h-4 w-4" />}
                 </Button>
+                {order && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleManualRefresh}
+                    disabled={refreshing}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                    Refresh
+                  </Button>
+                )}
               </form>
 
               {error && (

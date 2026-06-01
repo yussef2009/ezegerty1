@@ -92,7 +92,18 @@ export const translations = {
       successTitle: "Order Received!",
       successMessage: "Thank you for choosing Ezgerty. We have received your pickup request and will contact you shortly to confirm.",
       placeAnother: "Place Another Order",
-      required: "Required"
+      required: "Required",
+      selectService: "Select Service",
+      selectServicePlaceholder: "Choose a service...",
+      pieces: "Quantity/Pieces",
+      addItem: "Add Item",
+      orderItems: "Order Items",
+      other: "Other",
+      otherDescription: "Describe what you need",
+      otherDescPlaceholder: "Tell us about your custom cleaning needs...",
+      priceByAdmin: "Price to be determined by admin",
+      orderTotal: "Order Total",
+      removeItem: "Remove"
     },
     contact: {
       title: "Contact Us",
@@ -112,6 +123,20 @@ export const translations = {
       company: "Company",
       contactUs: "Contact Us",
       rights: "All rights reserved."
+    },
+    delivery: {
+      myLocation: "My Location",
+      gpsStatus: "GPS Status",
+      gpsConnected: "Connected",
+      gpsDisconnected: "Disconnected",
+      gpsDenied: "Permission Denied",
+      shareLocation: "Share Location",
+      enableLocation: "Enable GPS Tracking",
+      disableLocation: "Disable GPS Tracking",
+      currentLocation: "Current Location",
+      latitude: "Latitude",
+      longitude: "Longitude",
+      lastUpdated: "Last Updated"
     }
   },
   ar: {
@@ -207,7 +232,18 @@ export const translations = {
       successTitle: "تم استلام طلبك!",
       successMessage: "شكراً لاختياركم إزجيرتي. لقد استلمنا طلبكم وسنتواصل معكم قريباً للتأكيد.",
       placeAnother: "طلب جديد",
-      required: "مطلوب"
+      required: "مطلوب",
+      selectService: "اختر الخدمة",
+      selectServicePlaceholder: "اختر خدمة...",
+      pieces: "الكمية/القطع",
+      addItem: "إضافة عنصر",
+      orderItems: "عناصر الطلب",
+      other: "أخرى",
+      otherDescription: "صف ما تحتاجه",
+      otherDescPlaceholder: "أخبرنا عن احتياجاتك من التنظيف المخصص...",
+      priceByAdmin: "السعر سيحدده الإدارة",
+      orderTotal: "إجمالي الطلب",
+      removeItem: "حذف"
     },
     contact: {
       title: "تواصل معنا",
@@ -227,6 +263,20 @@ export const translations = {
       company: "الشركة",
       contactUs: "تواصل معنا",
       rights: "جميع الحقوق محفوظة."
+    },
+    delivery: {
+      myLocation: "موقعي",
+      gpsStatus: "حالة GPS",
+      gpsConnected: "متصل",
+      gpsDisconnected: "غير متصل",
+      gpsDenied: "تم رفض الإذن",
+      shareLocation: "مشاركة الموقع",
+      enableLocation: "تفعيل تتبع GPS",
+      disableLocation: "تعطيل تتبع GPS",
+      currentLocation: "الموقع الحالي",
+      latitude: "خط العرض",
+      longitude: "خط الطول",
+      lastUpdated: "آخر تحديث"
     }
   }
 };

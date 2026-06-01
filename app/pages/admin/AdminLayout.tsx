@@ -138,25 +138,14 @@ export function AdminLayout() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5" />
-                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-red-600">3</Badge>
+                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-gray-400">0</Badge>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div className="p-2 space-y-2">
-                  <div className="text-xs border-b pb-2 mb-2">
-                    <p className="font-semibold text-blue-600">New Order #ORD-987</p>
-                    <p className="text-gray-500">2 minutes ago</p>
-                  </div>
-                  <div className="text-xs border-b pb-2 mb-2">
-                    <p className="font-semibold text-green-600">New Business Account Request</p>
-                    <p className="text-gray-500">1 hour ago</p>
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-orange-600">Driver Ahmed is idle</p>
-                    <p className="text-gray-500">3 hours ago</p>
-                  </div>
+                <div className="p-2 text-center text-sm text-gray-500">
+                  <p>No notifications</p>
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
