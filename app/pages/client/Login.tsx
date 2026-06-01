@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth, prepareAuthPortal } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,6 +14,10 @@ export function ClientLogin() {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    prepareAuthPortal("client");
+  }, []);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -31,10 +35,8 @@ export function ClientLogin() {
     const { error } = await signIn(data.email, data.password);
     if (error) {
       setError(error.message);
-      setLoading(false);
-    } else {
-      navigate("/client/dashboard");
     }
+    setLoading(false);
   };
 
   return (

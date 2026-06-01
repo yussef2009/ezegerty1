@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth, prepareAuthPortal } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,13 +16,18 @@ export function AdminLogin() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!authLoading && user && role) {
-      // Check if user is an admin or delivery person
+    prepareAuthPortal("admin");
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && user) {
       if (role === "admin" || role === "delivery") {
         navigate("/admin/dashboard");
       } else {
-        // If user has a non-admin role, they belong in client area
-        navigate("/client/dashboard");
+        setError(
+          "This account does not have admin access. Use an admin account, sign in with Google from this page, or add your email to VITE_ADMIN_EMAILS."
+        );
+        setLoading(false);
       }
     }
   }, [user, role, authLoading, navigate]);
@@ -33,9 +38,8 @@ export function AdminLogin() {
     const { error } = await signIn(data.email, data.password);
     if (error) {
       setError(error.message);
-      setLoading(false);
     }
-    // Navigation is handled by the useEffect above once role is confirmed
+    setLoading(false);
   };
 
   return (

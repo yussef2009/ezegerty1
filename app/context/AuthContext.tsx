@@ -11,6 +11,59 @@ const supabase = createClient(
 // Enable a dev-only auto-login when running the dev server with `?dev=1`
 const devAutoLogin = import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1";
 
+export const AUTH_PORTAL_KEY = "auth_portal";
+export const OAUTH_PENDING_ROLE_KEY = "oauth_pending_role";
+
+function getAdminEmails(): string[] {
+  const raw = import.meta.env.VITE_ADMIN_EMAILS as string | undefined;
+  if (!raw?.trim()) return [];
+  return raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+}
+
+function isAdminEmail(email: string | undefined): boolean {
+  if (!email) return false;
+  return getAdminEmails().includes(email.toLowerCase());
+}
+
+/** OAuth pending role is only honored when it matches the active login portal. */
+function getPendingRoleForPortal(
+  portal: string | null,
+  pendingRole: string | null
+): string | null {
+  if (!portal || !pendingRole) return null;
+  if (portal === "admin") {
+    return pendingRole === "admin" || pendingRole === "delivery" ? pendingRole : null;
+  }
+  if (portal === "client") {
+    return pendingRole === "client" ? pendingRole : null;
+  }
+  return null;
+}
+
+function resolveRoleForPortal(
+  currentRole: string | null,
+  portal: string | null,
+  pendingRole: string | null,
+  email: string | undefined
+): string | null {
+  const portalPendingRole = getPendingRoleForPortal(portal, pendingRole);
+
+  if (portal === "admin") {
+    if (currentRole === "admin" || currentRole === "delivery") return currentRole;
+    if (portalPendingRole) return portalPendingRole;
+    if (isAdminEmail(email)) return "admin";
+    return currentRole;
+  }
+  if (!currentRole && portalPendingRole) return portalPendingRole;
+  return currentRole;
+}
+
+/** Call when entering a login page — clears stale OAuth role from an abandoned flow. */
+export function prepareAuthPortal(portal: "admin" | "client") {
+  sessionStorage.setItem(AUTH_PORTAL_KEY, portal);
+  sessionStorage.removeItem(OAUTH_PENDING_ROLE_KEY);
+}
+
 type AuthContextType = {
   session: Session | null;
   user: User | null;
@@ -66,23 +119,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = session?.user ?? null;
       let currentRole = currentUser?.user_metadata?.role ?? null;
 
-      // When a Google OAuth user signs in and has no role assigned yet,
-      // read the intended role from sessionStorage and sync it to their metadata.
-      if (_event === "SIGNED_IN" && currentUser && !currentRole) {
-        const pendingRole = sessionStorage.getItem("oauth_pending_role") ?? "client";
-        const pendingName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split("@")[0] || "User";
-        sessionStorage.removeItem("oauth_pending_role");
+      if (_event === "SIGNED_IN" && currentUser) {
+        const portal = sessionStorage.getItem(AUTH_PORTAL_KEY);
+        const rawPendingRole = sessionStorage.getItem(OAUTH_PENDING_ROLE_KEY);
+        const pendingRole = getPendingRoleForPortal(portal, rawPendingRole);
+        const targetRole = resolveRoleForPortal(
+          currentRole,
+          portal,
+          rawPendingRole,
+          currentUser.email
+        );
+        const pendingName =
+          currentUser.user_metadata?.full_name ||
+          currentUser.user_metadata?.name ||
+          currentUser.email?.split("@")[0] ||
+          "User";
 
-        // Persist the role and name into Supabase user metadata
-        try {
-          await supabase.auth.updateUser({
-            data: { role: pendingRole, name: pendingName },
-          });
-        } catch (error) {
-          console.error("Error updating user role:", error);
+        sessionStorage.removeItem(OAUTH_PENDING_ROLE_KEY);
+
+        if (targetRole && targetRole !== currentRole) {
+          try {
+            const { data, error } = await supabase.auth.updateUser({
+              data: { role: targetRole, name: pendingName },
+            });
+            if (error) {
+              console.error("Error updating user role:", error);
+            } else if (data.user) {
+              currentRole = data.user.user_metadata?.role ?? targetRole;
+              currentUser.user_metadata = data.user.user_metadata;
+            } else {
+              currentRole = targetRole;
+            }
+          } catch (error) {
+            console.error("Error updating user role:", error);
+          }
+        } else if (!currentRole && pendingRole) {
+          try {
+            const { data, error } = await supabase.auth.updateUser({
+              data: { role: pendingRole, name: pendingName },
+            });
+            if (!error && data.user) {
+              currentRole = data.user.user_metadata?.role ?? pendingRole;
+            } else {
+              currentRole = pendingRole;
+            }
+          } catch (error) {
+            console.error("Error updating user role:", error);
+          }
         }
-
-        currentRole = pendingRole;
       }
 
       setSession(session);
@@ -95,10 +179,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    // Password sign-in must not reuse a stale OAuth role from another portal
+    sessionStorage.removeItem(OAUTH_PENDING_ROLE_KEY);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    if (!error && data.user) {
+      const portal = sessionStorage.getItem(AUTH_PORTAL_KEY);
+      const currentRole = data.user.user_metadata?.role ?? null;
+      const targetRole = resolveRoleForPortal(
+        currentRole,
+        portal,
+        null,
+        data.user.email
+      );
+
+      if (targetRole && targetRole !== currentRole) {
+        const name =
+          data.user.user_metadata?.name ||
+          data.user.email?.split("@")[0] ||
+          "User";
+        const { data: updated, error: updateError } = await supabase.auth.updateUser({
+          data: { role: targetRole, name },
+        });
+        if (!updateError && updated.user) {
+          setUser(updated.user);
+          setRole(updated.user.user_metadata?.role ?? targetRole);
+          setSession(data.session);
+          return { error: null };
+        }
+      }
+
+      setSession(data.session);
+      setUser(data.user);
+      setRole(data.user.user_metadata?.role ?? null);
+    }
+
     return { error };
   };
 
@@ -113,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async (redirectTo?: string, role: string = "client") => {
     // Store the intended role in sessionStorage before redirecting to OAuth
     // Using sessionStorage because it persists across navigation but only for this session/tab
-    sessionStorage.setItem("oauth_pending_role", role);
+    sessionStorage.setItem(OAUTH_PENDING_ROLE_KEY, role);
 
     const origin = getOrigin();
     const { error } = await supabase.auth.signInWithOAuth({
