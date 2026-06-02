@@ -52,7 +52,7 @@ export function Entry() {
             <div className="mb-6 rounded-full bg-purple-100 p-6 dark:bg-purple-900/30">
               <ShieldCheck className="h-12 w-12 text-purple-600 dark:text-purple-400" />
             </div>
-            <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">Stakeholder</h2>
+            <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">Admin</h2>
             <p className="text-gray-600 dark:text-gray-400">
               I am an administrator or staff member.
             </p>

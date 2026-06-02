@@ -250,7 +250,7 @@ export function Tracker() {
                           className="h-16 w-16 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-800"
                         />
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{order.driverName || "Ahmed Hassan"}</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{order.driverName || "Your driver"}</p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">Delivery Associate</p>
                           <div className="mt-1 flex items-center text-xs text-yellow-500">
                             ★★★★★ (4.9)

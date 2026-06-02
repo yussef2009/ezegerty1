@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   User as UserIcon,
-  Landmark
+  Landmark,
+  Settings2
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { 
@@ -59,6 +60,7 @@ export function AdminLayout() {
     { name: "Premium Plans", path: "/admin/plans", icon: Sparkles },
     { name: "Promo Codes", path: "/admin/discounts", icon: Tag },
     { name: "Pending Payments", path: "/admin/payments", icon: Landmark },
+    { name: "Payment Settings", path: "/admin/settings", icon: Settings2 },
     { name: "Business Requests", path: "/admin/business-requests", icon: Users },
   ];
 
@@ -157,7 +159,7 @@ export function AdminLayout() {
                   <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
                     <UserIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <span className="hidden sm:inline font-medium text-sm">Stakeholder</span>
+                  <span className="hidden sm:inline font-medium text-sm">Admin</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

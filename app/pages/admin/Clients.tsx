@@ -50,53 +50,7 @@ export function AdminClients() {
     setLoading(true);
     try {
       const data = await dbGet("clients_list");
-      
-      // If no data, provide some mock data for the stakeholder to see
-      if (!data || data.length === 0) {
-        const mockClients: Client[] = [
-          { 
-            id: "c1", 
-            name: "Zeyad Mohamed", 
-            email: "zeyad@example.com", 
-            phone: "+20 123 456 7890", 
-            address: "123 Corniche Road, Alexandria",
-            lastActive: new Date().toISOString(), 
-            blocked: false,
-            totalOrders: 12,
-            joinedAt: "2024-01-15T10:00:00Z",
-            preferredPayment: "Instapay"
-          },
-          { 
-            id: "c2", 
-            name: "Laila Ahmed", 
-            email: "laila@example.com", 
-            phone: "+20 100 222 3333", 
-            address: "Sidi Gaber, Alexandria",
-            lastActive: new Date(Date.now() - 86400000 * 2).toISOString(), 
-            blocked: true,
-            totalOrders: 5,
-            joinedAt: "2024-02-10T14:30:00Z",
-            preferredPayment: "Cash"
-          },
-          { 
-            id: "c3", 
-            name: "Karim Hassan", 
-            email: "karim@business.com", 
-            phone: "+20 111 555 6666", 
-            address: "Smouha, Alexandria",
-            lastActive: new Date(Date.now() - 3600000 * 5).toISOString(), 
-            blocked: false,
-            totalOrders: 45,
-            joinedAt: "2023-11-20T09:15:00Z",
-            preferredPayment: "Visa"
-          }
-        ];
-        setClients(mockClients);
-        // Save mock data for next time
-        await saveClients(mockClients);
-      } else {
-        setClients(data);
-      }
+      setClients(data && Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching clients:", error);
     } finally {

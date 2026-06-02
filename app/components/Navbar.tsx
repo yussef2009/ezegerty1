@@ -103,6 +103,12 @@ export function Navbar() {
                       Admin Dashboard
                     </DropdownMenuItem>
                   )}
+                  {role === 'delivery' && (
+                    <DropdownMenuItem onClick={() => navigate("/delivery/dashboard")}>
+                      <Truck className="mr-2 h-4 w-4" />
+                      Delivery App
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => navigate("/track")}>
                     <Truck className="mr-2 h-4 w-4" />
                     Track Latest Order

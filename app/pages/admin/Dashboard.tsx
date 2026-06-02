@@ -127,7 +127,7 @@ export function AdminDashboard() {
     <div className="space-y-8 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Stakeholder Overview</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Overview</h1>
           <p className="text-gray-500">Welcome back! Here's what's happening today.</p>
         </div>
         <div className="flex gap-2">

@@ -17,6 +17,7 @@ type Service = {
   name: string;
   price: number;
   description?: string;
+  category?: string;
 };
 
 type OrderItem = {
@@ -84,9 +85,6 @@ export function Order() {
         const instapay = await dbGet("instapay_account");
         if (instapay?.number) {
           setInstapayNumber(instapay.number);
-        } else {
-          // Fallback if not configured
-          setInstapayNumber("01000000000");
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -148,6 +146,11 @@ export function Order() {
   const onSubmit = async (data: OrderFormData) => {
     if (orderItems.length === 0) {
       alert("Please add at least one service to your order");
+      return;
+    }
+
+    if (data.paymentMethod === "instapay" && !instapayNumber) {
+      alert("Instapay is not available. Choose cash or contact us.");
       return;
     }
 
@@ -246,13 +249,18 @@ export function Order() {
                     disabled={servicesLoading}
                   >
                     <option value="">{t.order.selectServicePlaceholder}</option>
-                    {services.map(service => (
+                    {services.filter(s => !s.category || s.category === "Delivery" || s.category === "In-Store Service" || s.category === "Pickup").map(service => (
                       <option key={service.id} value={service.id}>
-                        {service.name} - {service.price} EGP
+                        {service.name} — {service.price} EGP{service.category ? ` (${service.category})` : ""}
                       </option>
                     ))}
                     <option value="other">{t.order.other}</option>
                   </select>
+                  {!servicesLoading && services.length === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      No services yet. Admin can add them under Manage Services, or choose Other.
+                    </p>
+                  )}
                 </div>
 
                 {selectedService && selectedService !== "other" && (
@@ -324,11 +332,18 @@ export function Order() {
                   ))}
                   
                   {/* Total */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-200 dark:border-blue-800 mt-3">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-200 dark:border-blue-800 mt-3 space-y-1">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-gray-900 dark:text-white">{t.order.orderTotal}</span>
-                      <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{totalOrderAmount} EGP</span>
+                      <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                        {orderItems.some((i) => i.isOther) && totalOrderAmount === 0
+                          ? "TBD"
+                          : `${totalOrderAmount} EGP`}
+                      </span>
                     </div>
+                    {orderItems.some((i) => i.isOther) && (
+                      <p className="text-xs text-orange-700 dark:text-orange-300">{t.order.priceByAdmin}</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -410,8 +425,8 @@ export function Order() {
                       <Label htmlFor="cash" className="font-normal cursor-pointer dark:text-white">{t.order.cash}</Label>
                     </div>
                     <div className="flex items-center gap-2">
-                      <RadioGroupItem value="instapay" id="instapay" />
-                      <Label htmlFor="instapay" className="font-normal cursor-pointer dark:text-white">{t.order.instapay}</Label>
+                      <RadioGroupItem value="instapay" id="instapay" disabled={!instapayNumber} />
+                      <Label htmlFor="instapay" className={`font-normal cursor-pointer dark:text-white ${!instapayNumber ? "opacity-50" : ""}`}>{t.order.instapay}</Label>
                     </div>
                   </RadioGroup>
                 )}
@@ -425,6 +440,7 @@ export function Order() {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden space-y-4"
               >
+                {instapayNumber ? (
                 <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:bg-purple-900/20 dark:border-purple-800">
                   <p className="mb-2 text-sm text-purple-800 dark:text-purple-300 font-medium">
                     {t.order.instapayNumber}
@@ -432,7 +448,15 @@ export function Order() {
                   <div className="flex items-center justify-between rounded-md bg-white p-3 dark:bg-gray-800">
                     <code className="text-lg font-mono font-bold text-gray-800 dark:text-white">{instapayNumber}</code>
                   </div>
+                  <p className="mt-2 text-xs text-purple-700 dark:text-purple-300">
+                    Payment will stay pending until admin confirms in Pending Payments.
+                  </p>
                 </div>
+                ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:bg-amber-900/20 dark:border-amber-800 text-sm text-amber-900 dark:text-amber-200">
+                  Instapay is not configured yet. Ask admin to set the number under Admin → Payment Settings, or pay with cash.
+                </div>
+                )}
 
                 <div className="space-y-2">
                   <label htmlFor="tips" className="text-sm font-medium leading-none dark:text-white">Add a Tip (Optional)</label>

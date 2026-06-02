@@ -22,7 +22,9 @@ export function AdminLogin() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      if (role === "admin" || role === "delivery") {
+      if (role === "delivery") {
+        navigate("/delivery/dashboard");
+      } else if (role === "admin") {
         navigate("/admin/dashboard");
       } else {
         setError(
@@ -49,7 +51,7 @@ export function AdminLogin() {
       <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-lg dark:bg-gray-900 dark:border dark:border-gray-800">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Stakeholder Access
+            Admin Access
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             Sign in to manage orders and view reports

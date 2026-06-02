@@ -18,6 +18,7 @@ import { AdminDelivery } from "./pages/admin/Delivery";
 import { AdminServicesDashboard } from "./pages/admin/ServicesDashboard";
 import { AdminPayments } from "./pages/admin/Payments";
 import { AdminBusinessRequests } from "./pages/admin/BusinessRequests";
+import { AdminSettings } from "./pages/admin/Settings";
 import { Tracker } from "./pages/Tracker";
 import { ClientLogin } from "./pages/client/Login";
 import { ClientSignup } from "./pages/client/Signup";
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
       { path: "services-dashboard", Component: AdminServicesDashboard },
       { path: "payments", Component: AdminPayments },
       { path: "business-requests", Component: AdminBusinessRequests },
+      { path: "settings", Component: AdminSettings },
     ]
   },
   {

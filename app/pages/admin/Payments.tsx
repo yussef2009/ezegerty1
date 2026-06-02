@@ -59,10 +59,26 @@ export function AdminPayments() {
     if (!order) return;
     
     let updatedOrder: Order = { ...order, paymentStatus: status };
-    
-    // If setting a price override for "Other" services
-    if (status === "confirmed" && priceOverride[orderId]) {
-      updatedOrder.total = priceOverride[orderId];
+
+    if (status === "confirmed" && priceOverride[orderId] != null) {
+      const finalTotal = priceOverride[orderId];
+      updatedOrder.total = finalTotal;
+      if (updatedOrder.items?.length) {
+        const otherIndexes = updatedOrder.items
+          .map((item, i) => (item.isOther ? i : -1))
+          .filter((i) => i >= 0);
+        if (otherIndexes.length === 1) {
+          const idx = otherIndexes[0];
+          const priced = updatedOrder.items[idx];
+          const catalogSubtotal = updatedOrder.items
+            .filter((item) => !item.isOther)
+            .reduce((sum, item) => sum + item.price * item.quantity, 0);
+          const otherLineTotal = Math.max(0, finalTotal - catalogSubtotal);
+          updatedOrder.items = updatedOrder.items.map((item, i) =>
+            i === idx ? { ...item, price: otherLineTotal } : item
+          );
+        }
+      }
     }
     
     try {
@@ -210,7 +226,16 @@ export function AdminPayments() {
                   <Button 
                     size="sm" 
                     className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={
+                      !!orders.find((o) => o.id === expandedId)?.priceByAdmin &&
+                      !(priceOverride[expandedId] ?? 0)
+                    }
                     onClick={() => {
+                      const o = orders.find((x) => x.id === expandedId);
+                      if (o?.priceByAdmin && !priceOverride[expandedId]) {
+                        toast.error("Set a final price before confirming");
+                        return;
+                      }
                       confirmPayment(expandedId, "confirmed");
                       setExpandedId(null);
                     }}

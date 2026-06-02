@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { dbGetByPrefix, dbSet } from "../../lib/db";
+import { useAuth } from "../../context/AuthContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -30,6 +32,8 @@ type GPSLocation = {
 
 export function DeliveryDashboard() {
   const { t } = useLanguage();
+  const { user, role, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [gpsEnabled, setGpsEnabled] = useState(false);
@@ -55,6 +59,12 @@ export function DeliveryDashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!authLoading && (!user || (role !== "delivery" && role !== "admin"))) {
+      navigate("/admin-login");
+    }
+  }, [user, role, authLoading, navigate]);
 
   useEffect(() => {
     fetchOrders();
@@ -127,8 +137,11 @@ export function DeliveryDashboard() {
           };
           setCurrentLocation(location);
           setGpsStatus("connected");
-          // Store in DB for tracking
           await dbSet("driver_current_location", location);
+          const allOrders = await dbGetByPrefix("order:");
+          for (const o of allOrders.filter((x: Order) => x.status === "delivering")) {
+            await dbSet(`driver_location:${o.id}`, location);
+          }
         },
         (error) => {
           console.error("Error watching position:", error);
@@ -162,7 +175,7 @@ export function DeliveryDashboard() {
         </div>
       </div>
 
-      <Tabs defaultValue="orders" className="w-full">
+      <Tabs defaultValue="my-location" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="my-location">
             <MapPin className="h-4 w-4 mr-2" />

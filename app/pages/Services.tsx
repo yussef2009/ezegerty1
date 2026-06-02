@@ -10,6 +10,7 @@ type Service = {
   name: string;
   price: number;
   description: string;
+  category?: string;
 };
 
 export function Services() {
@@ -17,60 +18,7 @@ export function Services() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Default hardcoded services
-  const defaultServices = [
-    {
-      id: "dry-clean",
-      title: t.servicesPage.dryClean,
-      description: t.servicesPage.dryCleanDesc,
-      icon: <Briefcase className="h-8 w-8 text-blue-500" />,
-      price: `${t.servicesPage.priceStart} 50 EGP`,
-    },
-    {
-      id: "laundry",
-      title: t.servicesPage.laundry,
-      description: t.servicesPage.laundryDesc,
-      icon: <ShoppingBag className="h-8 w-8 text-blue-500" />,
-      price: `${t.servicesPage.priceStart} 30 EGP / kg`,
-    },
-    {
-      id: "fast-clean",
-      title: t.servicesPage.fastClean,
-      description: t.servicesPage.fastCleanDesc,
-      icon: <Zap className="h-8 w-8 text-yellow-500" />,
-      price: `${t.servicesPage.priceStart} 100 EGP`,
-    },
-    {
-      id: "ironing",
-      title: t.servicesPage.ironing,
-      description: t.servicesPage.ironingDesc,
-      icon: <Shirt className="h-8 w-8 text-blue-500" />,
-      price: `${t.servicesPage.priceStart} 20 EGP`,
-    },
-    {
-      id: "household",
-      title: t.servicesPage.household,
-      description: t.servicesPage.householdDesc,
-      icon: <Sofa className="h-8 w-8 text-blue-500" />,
-      price: t.servicesPage.contactQuote,
-    },
-    {
-      id: "alterations",
-      title: t.servicesPage.alterations,
-      description: t.servicesPage.alterationsDesc,
-      icon: <Scissors className="h-8 w-8 text-blue-500" />,
-      price: t.servicesPage.complexity,
-    },
-    {
-      id: "shoes",
-      title: t.servicesPage.shoes,
-      description: t.servicesPage.shoesDesc,
-      icon: <SprayCan className="h-8 w-8 text-blue-500" />,
-      price: `${t.servicesPage.priceStart} 100 EGP`,
-    },
-  ];
-
-  // Fetch dynamic services from DB
+  // Fetch services from DB (managed in Admin → Manage Services)
   useEffect(() => {
     const fetchServices = async () => {
       setLoading(true);
@@ -93,14 +41,14 @@ export function Services() {
     fetchServices();
   }, []);
 
-  // Use DB services if available, otherwise use hardcoded defaults
-  const displayServices = services.length > 0 ? services.map(s => ({
+  const displayServices = services.map((s) => ({
     id: s.id,
     title: s.name,
     description: s.description || "",
     icon: <Briefcase className="h-8 w-8 text-blue-500" />,
     price: `${s.price} EGP`,
-  })) : defaultServices;
+    category: s.category,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 dark:bg-gray-950 transition-colors duration-300">
@@ -112,6 +60,13 @@ export function Services() {
           </p>
         </div>
 
+        {loading ? (
+          <p className="text-center text-gray-500">Loading services...</p>
+        ) : displayServices.length === 0 ? (
+          <p className="text-center text-gray-500 max-w-md mx-auto">
+            Services will appear here once added in the admin panel (Manage Services).
+          </p>
+        ) : (
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           {displayServices.map((service) => (
             <div
@@ -134,8 +89,9 @@ export function Services() {
             </div>
           ))}
         </div>
+        )}
 
-        {/* Pricing Table */}
+        {displayServices.length > 0 && (
         <div className="mt-20">
           <h2 className="mb-8 text-center text-3xl font-bold text-gray-900 dark:text-white">{t.servicesPage.pricingTitle}</h2>
           <div className="overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-gray-900 dark:border-gray-800">
@@ -147,17 +103,10 @@ export function Services() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
-                {[
-                  { name: "Shirt (Wash & Iron)", price: "35" },
-                  { name: "Trousers (Dry Clean)", price: "45" },
-                  { name: "Suit (2 Piece)", price: "90" },
-                  { name: "Dress (Simple)", price: "80" },
-                  { name: "Coat / Jacket", price: "100" },
-                  { name: "Bed Sheet (Double)", price: "50" },
-                ].map((item, idx) => (
-                  <tr key={idx} className={idx % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/50"}>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{item.name}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-500 dark:text-gray-400">{item.price}</td>
+                {displayServices.map((item, idx) => (
+                  <tr key={item.id} className={idx % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/50"}>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{item.title}</td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-500 dark:text-gray-400">{item.price.replace(" EGP", "")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -169,6 +118,7 @@ export function Services() {
              </Link>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
