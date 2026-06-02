@@ -10,7 +10,7 @@ type Plan = {
   id: string;
   name: string;
   price: number;
-  interval: "monthly" | "yearly";
+  interval: "weekly" | "monthly" | "yearly" | "pieces";
   features: string;
 };
 
@@ -40,7 +40,7 @@ export function AdminPlans() {
       id: Math.random().toString(36).substr(2, 9),
       name: newPlan.name,
       price: parseFloat(newPlan.price),
-      interval: newPlan.interval as "monthly" | "yearly",
+      interval: newPlan.interval as Plan["interval"],
       features: newPlan.features
     };
     const updated = [...plans, newItem];
@@ -90,10 +90,12 @@ export function AdminPlans() {
               <select 
                 className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                 value={newPlan.interval}
-                onChange={(e: any) => setNewPlan({...newPlan, interval: e.target.value})}
+                onChange={(e) => setNewPlan({...newPlan, interval: e.target.value})}
               >
+                <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
                 <option value="yearly">Yearly</option>
+                <option value="pieces">Pay per piece (no subscription)</option>
               </select>
             </div>
           </div>
@@ -115,7 +117,7 @@ export function AdminPlans() {
               value={newPlan.features} 
               onChange={e => setNewPlan({...newPlan, features: e.target.value})}
             />
-            <p className="text-[10px] text-gray-400">Separate features with commas</p>
+            <p className="text-[10px] text-gray-400">One feature per line (shown on home page)</p>
           </div>
           <Button onClick={handleAdd} className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700">
             Publish Subscription Plan

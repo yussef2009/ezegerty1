@@ -1,0 +1,67 @@
+export type Discount = {
+  id: string;
+  code: string;
+  amount: number;
+  type: "percentage" | "fixed";
+};
+
+export type OrderItem = {
+  serviceId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  isOther?: boolean;
+  otherDescription?: string;
+  category?: string;
+};
+
+export function applyCoupon(subtotal: number, discount: Discount | null): number {
+  if (!discount || subtotal <= 0) return subtotal;
+  if (discount.type === "percentage") {
+    return Math.max(0, subtotal - (subtotal * discount.amount) / 100);
+  }
+  return Math.max(0, subtotal - discount.amount);
+}
+
+export function orderSubtotal(items: OrderItem[] = []): number {
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+
+export function revenueFromOrder(order: {
+  total?: number;
+  paymentStatus?: string;
+  paymentMethod?: string;
+}): number {
+  const paid =
+    order.paymentStatus === "confirmed" ||
+    order.paymentMethod === "cash" ||
+    (!order.paymentStatus && order.paymentMethod !== "instapay");
+  return paid ? order.total || 0 : 0;
+}
+
+export function categoryRevenue(
+  orders: { items?: OrderItem[]; paymentStatus?: string; paymentMethod?: string; total?: number }[],
+  services: { id: string; category?: string }[]
+): Record<string, number> {
+  const serviceCat = new Map(services.map((s) => [s.id, s.category || "Uncategorized"]));
+  const out: Record<string, number> = {};
+
+  for (const order of orders) {
+    if (!order.items?.length) continue;
+    const paid = revenueFromOrder(order) > 0;
+    if (!paid) continue;
+    const orderTotal = order.total || 0;
+    const sub = orderSubtotal(order.items);
+    if (sub <= 0) continue;
+
+    for (const item of order.items) {
+      const cat =
+        item.category ||
+        (item.isOther ? "Other" : serviceCat.get(item.serviceId) || "Uncategorized");
+      const line = item.price * item.quantity;
+      const share = (line / sub) * orderTotal;
+      out[cat] = (out[cat] || 0) + share;
+    }
+  }
+  return out;
+}

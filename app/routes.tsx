@@ -15,6 +15,7 @@ import { AdminPlans } from "./pages/admin/Plans";
 import { AdminServices } from "./pages/admin/Services";
 import { AdminTracking } from "./pages/admin/Tracking";
 import { AdminDelivery } from "./pages/admin/Delivery";
+import { AdminDeliveryDashboard } from "./pages/admin/AdminDeliveryDashboard";
 import { AdminServicesDashboard } from "./pages/admin/ServicesDashboard";
 import { AdminPayments } from "./pages/admin/Payments";
 import { AdminBusinessRequests } from "./pages/admin/BusinessRequests";
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
       { path: "services", Component: AdminServices },
       { path: "tracking", Component: AdminTracking },
       { path: "delivery", Component: AdminDelivery },
+      { path: "delivery-dashboard", Component: AdminDeliveryDashboard },
       { path: "services-dashboard", Component: AdminServicesDashboard },
       { path: "payments", Component: AdminPayments },
       { path: "business-requests", Component: AdminBusinessRequests },

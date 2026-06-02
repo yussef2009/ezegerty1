@@ -11,6 +11,7 @@ import { Label } from "../components/ui/label";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { dbSet, dbGet } from "../lib/db";
+import { applyCoupon, type Discount } from "../lib/orderFinance";
 
 type Service = {
   id: string;
@@ -27,6 +28,7 @@ type OrderItem = {
   price: number;
   isOther: boolean;
   otherDescription?: string;
+  category?: string;
 };
 
 type OrderFormData = {
@@ -63,6 +65,9 @@ export function Order() {
   const [otherDescription, setOtherDescription] = useState("");
   const [instapayNumber, setInstapayNumber] = useState("");
   const [servicesLoading, setServicesLoading] = useState(true);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Discount | null>(null);
+  const [couponError, setCouponError] = useState("");
   
   // Pre-fill user data if logged in
   useEffect(() => {
@@ -86,6 +91,7 @@ export function Order() {
         if (instapay?.number) {
           setInstapayNumber(instapay.number);
         }
+        // discounts loaded on apply
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -101,7 +107,28 @@ export function Order() {
     name: "paymentMethod",
   });
 
-  const totalOrderAmount = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discountedSubtotal = applyCoupon(subtotal, appliedCoupon);
+  const hasOtherPending = orderItems.some((i) => i.isOther);
+
+  const applyCouponCode = async () => {
+    setCouponError("");
+    const code = couponCode.trim().toUpperCase();
+    if (!code) return;
+    try {
+      const discounts = (await dbGet("discounts")) as Discount[] | null;
+      const match = (discounts || []).find((d) => d.code?.toUpperCase() === code);
+      if (!match) {
+        setCouponError("Invalid coupon code");
+        setAppliedCoupon(null);
+        return;
+      }
+      setAppliedCoupon(match);
+      setCouponError("");
+    } catch {
+      setCouponError("Could not validate coupon");
+    }
+  };
 
   const addItem = () => {
     if (!selectedService) return;
@@ -129,7 +156,8 @@ export function Order() {
         name: service.name,
         quantity: parseInt(String(quantity)),
         price: service.price,
-        isOther: false
+        isOther: false,
+        category: service.category,
       };
     }
     
@@ -166,7 +194,10 @@ export function Order() {
         status: "pending",
         createdAt: new Date().toISOString(),
         items: orderItems,
-        total: totalOrderAmount + (data.tips || 0),
+        subtotal,
+        couponCode: appliedCoupon?.code || null,
+        discountAmount: subtotal - discountedSubtotal,
+        total: discountedSubtotal + (data.tips || 0),
         paymentStatus: data.paymentMethod === "instapay" ? "pending" : "confirmed",
         paymentMethod: data.paymentMethod.toLowerCase(),
         priceByAdmin: orderItems.some(item => item.isOther),
@@ -336,11 +367,16 @@ export function Order() {
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-gray-900 dark:text-white">{t.order.orderTotal}</span>
                       <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                        {orderItems.some((i) => i.isOther) && totalOrderAmount === 0
+                        {hasOtherPending && subtotal === 0
                           ? "TBD"
-                          : `${totalOrderAmount} EGP`}
+                          : `${discountedSubtotal} EGP`}
                       </span>
                     </div>
+                    {appliedCoupon && subtotal > 0 && (
+                      <p className="text-xs text-green-700 dark:text-green-400">
+                        Coupon {appliedCoupon.code} applied (−{(subtotal - discountedSubtotal).toFixed(0)} EGP)
+                      </p>
+                    )}
                     {orderItems.some((i) => i.isOther) && (
                       <p className="text-xs text-orange-700 dark:text-orange-300">{t.order.priceByAdmin}</p>
                     )}
@@ -407,6 +443,23 @@ export function Order() {
                   <option value="evening">{t.order.evening}</option>
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-2 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border dark:border-gray-700">
+              <label className="text-sm font-medium dark:text-white">Coupon code (optional)</label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="PROMO2024"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  className="dark:bg-gray-900"
+                />
+                <Button type="button" variant="outline" onClick={applyCouponCode}>
+                  Apply
+                </Button>
+              </div>
+              {couponError && <p className="text-xs text-red-500">{couponError}</p>}
+              {appliedCoupon && <p className="text-xs text-green-600">Coupon active: {appliedCoupon.code}</p>}
             </div>
 
             <div className="space-y-2">

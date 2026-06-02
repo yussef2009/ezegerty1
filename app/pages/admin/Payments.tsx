@@ -4,7 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Loader2, RefreshCw, Check, X, Landmark, Receipt, AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Loader2, RefreshCw, Check, X, Landmark, Receipt, AlertCircle, Tag } from "lucide-react";
 import { toast } from "sonner";
 
 type OrderItem = {
@@ -30,6 +31,7 @@ type Order = {
 
 export function AdminPayments() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [otherOrders, setOtherOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [priceOverride, setPriceOverride] = useState<{ [key: string]: number }>({});
@@ -38,15 +40,51 @@ export function AdminPayments() {
     setLoading(true);
     try {
       const values = await dbGetByPrefix("order:");
-      // Find orders where payment is pending or payment method is instapay (lowercase)
-      const pending = values.filter((o: Order) => 
-        o.paymentStatus === 'pending' || (o.paymentMethod === 'instapay' && !o.paymentStatus)
+      const pending = values.filter(
+        (o: Order) =>
+          o.paymentStatus === "pending" || (o.paymentMethod === "instapay" && !o.paymentStatus)
+      );
+      const other = values.filter(
+        (o: Order) =>
+          o.priceByAdmin &&
+          (o.paymentStatus === "pending" || !o.paymentStatus || o.total === 0)
       );
       setOrders(pending);
+      setOtherOrders(other);
     } catch (error) {
       toast.error("Failed to load payments");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveOtherPrice = async (orderId: string) => {
+    const order = otherOrders.find((o) => o.id === orderId);
+    const finalTotal = priceOverride[orderId];
+    if (!order || finalTotal == null || finalTotal <= 0) {
+      toast.error("Enter a valid price");
+      return;
+    }
+    let updated: Order = { ...order, total: finalTotal, paymentStatus: order.paymentStatus || "pending" };
+    if (updated.items?.length) {
+      const otherIndexes = updated.items.map((item, i) => (item.isOther ? i : -1)).filter((i) => i >= 0);
+      if (otherIndexes.length === 1) {
+        const idx = otherIndexes[0];
+        const catalogSubtotal = updated.items
+          .filter((item) => !item.isOther)
+          .reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const otherLineTotal = Math.max(0, finalTotal - catalogSubtotal);
+        updated.items = updated.items.map((item, i) =>
+          i === idx ? { ...item, price: otherLineTotal } : item
+        );
+      }
+    }
+    try {
+      await dbSet(`order:${orderId}`, updated);
+      setOtherOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+      toast.success("Price saved for Other item");
+    } catch {
+      toast.error("Save failed");
     }
   };
 
@@ -101,9 +139,9 @@ export function AdminPayments() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             <Landmark className="h-7 w-7 text-blue-600" />
-            Pending Payments
+            Payments & Pricing
           </h1>
-          <p className="text-gray-500 text-sm">Verify Instapay and manual payment transfers</p>
+          <p className="text-gray-500 text-sm">Instapay verification and custom &quot;Other&quot; order prices</p>
         </div>
         <Button onClick={fetchPendingPayments} variant="outline" size="sm" className="gap-2">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -111,6 +149,66 @@ export function AdminPayments() {
         </Button>
       </div>
 
+      <Tabs defaultValue="instapay" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="instapay">Instapay Pending</TabsTrigger>
+          <TabsTrigger value="other">Other — Set Price ({otherOrders.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="other" className="space-y-4">
+          <div className="rounded-2xl border bg-white shadow-sm dark:bg-gray-900 dark:border-gray-800 overflow-hidden">
+            {loading ? (
+              <div className="py-16 text-center">
+                <Loader2 className="animate-spin inline h-8 w-8 text-blue-600" />
+              </div>
+            ) : otherOrders.length === 0 ? (
+              <div className="py-16 text-center text-gray-500">No orders waiting for Other item pricing</div>
+            ) : (
+              <div className="divide-y dark:divide-gray-800">
+                {otherOrders.map((order) => (
+                  <div key={order.id} className="p-6 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-gray-900 dark:text-white">{order.name}</p>
+                        <p className="text-sm text-gray-500">#{order.id.slice(-8)} · {order.phone}</p>
+                      </div>
+                      <Badge variant="outline" className="text-orange-700 border-orange-200">
+                        Price by admin
+                      </Badge>
+                    </div>
+                    {order.items?.map((item, idx) => (
+                      <div key={idx} className="text-sm text-gray-600 dark:text-gray-400">
+                        {item.name}
+                        {item.isOther && item.otherDescription ? ` — ${item.otherDescription}` : ""}
+                      </div>
+                    ))}
+                    <div className="flex gap-2 items-end max-w-sm">
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-gray-500">Final order total (EGP)</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={priceOverride[order.id] ?? (order.total || "")}
+                          onChange={(e) =>
+                            setPriceOverride((prev) => ({
+                              ...prev,
+                              [order.id]: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                      </div>
+                      <Button className="bg-orange-600 hover:bg-orange-700" onClick={() => saveOtherPrice(order.id)}>
+                        Save Price
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="instapay">
       <div className="rounded-2xl border bg-white shadow-sm dark:bg-gray-900 dark:border-gray-800 overflow-hidden">
         <Table>
           <TableHeader>
@@ -266,6 +364,16 @@ export function AdminPayments() {
           <p className="font-semibold">Security Note</p>
           <p>Please cross-reference Instapay transfers with your business account before confirming payments here. Confirmed payments will automatically update the client's order status.</p>
         </div>
+      </div>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex items-center gap-2 text-sm text-gray-500">
+        <Tag className="h-4 w-4" />
+        Manage coupon codes under{" "}
+        <a href="/admin/discounts" className="text-blue-600 underline">
+          Promo Codes
+        </a>
       </div>
     </div>
   );

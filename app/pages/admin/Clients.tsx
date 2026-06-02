@@ -25,6 +25,8 @@ import {
   DialogFooter
 } from "../../components/ui/dialog";
 import { dbGet, dbSet } from "../../lib/db";
+import { Crown } from "lucide-react";
+import { toast } from "sonner";
 
 type Client = {
   id: string;
@@ -45,6 +47,10 @@ export function AdminClients() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [plans, setPlans] = useState<{ id: string; name: string }[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [activatingPremium, setActivatingPremium] = useState(false);
+  const [clientPremium, setClientPremium] = useState<string | null>(null);
 
   const fetchClients = async () => {
     setLoading(true);
@@ -68,6 +74,9 @@ export function AdminClients() {
 
   useEffect(() => {
     fetchClients();
+    dbGet("plans").then((data) => {
+      if (data && Array.isArray(data)) setPlans(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })));
+    });
   }, []);
 
   const toggleBlock = async (client: Client) => {
@@ -78,9 +87,52 @@ export function AdminClients() {
     await saveClients(updatedClients);
   };
 
-  const openDetails = (client: Client) => {
+  const openDetails = async (client: Client) => {
     setSelectedClient(client);
     setIsDetailsOpen(true);
+    setClientPremium(null);
+    try {
+      const sub = await dbGet(`user_subscription:${client.id}`);
+      if (sub?.active && sub.planName) setClientPremium(sub.planName);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const activatePremium = async () => {
+    if (!selectedClient || !selectedPlanId) {
+      toast.error("Select a plan");
+      return;
+    }
+    const plan = plans.find((p) => p.id === selectedPlanId);
+    if (!plan) return;
+    setActivatingPremium(true);
+    try {
+      await dbSet(`user_subscription:${selectedClient.id}`, {
+        planId: plan.id,
+        planName: plan.name,
+        active: true,
+        startedAt: new Date().toISOString(),
+        activatedBy: "admin",
+      });
+      setClientPremium(plan.name);
+      toast.success(`Premium activated for ${selectedClient.name}`);
+    } catch {
+      toast.error("Failed to activate premium");
+    } finally {
+      setActivatingPremium(false);
+    }
+  };
+
+  const deactivatePremium = async () => {
+    if (!selectedClient) return;
+    try {
+      await dbSet(`user_subscription:${selectedClient.id}`, { active: false, endedAt: new Date().toISOString() });
+      setClientPremium(null);
+      toast.success("Premium deactivated");
+    } catch {
+      toast.error("Failed to deactivate");
+    }
   };
 
   const filteredClients = clients.filter(client => 
@@ -242,12 +294,46 @@ export function AdminClients() {
                 </div>
               </div>
 
+              <div className="mt-4 pt-4 border-t dark:border-gray-700 space-y-4">
+                <h3 className="font-semibold text-sm uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-yellow-600" /> Premium
+                </h3>
+                {clientPremium ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                      Active: {clientPremium}
+                    </Badge>
+                    <Button variant="outline" size="sm" onClick={deactivatePremium}>
+                      Remove Premium
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm dark:bg-gray-800"
+                      value={selectedPlanId}
+                      onChange={(e) => setSelectedPlanId(e.target.value)}
+                    >
+                      <option value="">Select plan…</option>
+                      {plans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={activatePremium} disabled={activatingPremium}>
+                      {activatingPremium ? <Loader2 className="h-4 w-4 animate-spin" /> : "Activate Premium"}
+                    </Button>
+                  </div>
+                )}
+                {plans.length === 0 && (
+                  <p className="text-xs text-gray-500">Add plans under Admin → Premium Plans first.</p>
+                )}
+              </div>
+
               <div className="mt-4 pt-4 border-t dark:border-gray-700">
                 <h3 className="font-semibold text-sm uppercase tracking-wider text-gray-500 mb-3">Quick Actions</h3>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm">Send Message</Button>
-                  <Button variant="outline" size="sm">Reset Password</Button>
-                  <Button variant="outline" size="sm" className="text-blue-600">Apply Manual Discount</Button>
                   <Button variant="outline" size="sm" className="text-red-600" onClick={() => { toggleBlock(selectedClient); setIsDetailsOpen(false); }}>
                     {selectedClient.blocked ? "Unblock Account" : "Block Account"}
                   </Button>

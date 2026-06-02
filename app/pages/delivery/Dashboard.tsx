@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Input } from "../../components/ui/input";
 import { Loader2, MapPin, Phone, User, Package, Truck, Clock, Map, AlertCircle, CheckCircle2, CircleOff } from "lucide-react";
 import { motion } from "motion/react";
 import { useLanguage } from "../../context/LanguageContext";
@@ -19,6 +20,8 @@ type Order = {
   status: "pending" | "cleaning" | "ready" | "delivering" | "delivered";
   paymentMethod: string;
   total: number;
+  deliveryTip?: number;
+  tips?: number;
   createdAt: string;
   pickupDate: string;
   pickupTime: string;
@@ -40,6 +43,7 @@ export function DeliveryDashboard() {
   const [gpsStatus, setGpsStatus] = useState<"disconnected" | "connected" | "denied">("disconnected");
   const [currentLocation, setCurrentLocation] = useState<GPSLocation | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
+  const [deliveryTips, setDeliveryTips] = useState<Record<string, number>>({});
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -102,7 +106,12 @@ export function DeliveryDashboard() {
   const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    const updatedOrder: Order = { ...order, status: newStatus };
+    const tip = deliveryTips[orderId] ?? order.deliveryTip ?? 0;
+    const updatedOrder: Order = {
+      ...order,
+      status: newStatus,
+      ...(newStatus === "delivered" && tip > 0 ? { deliveryTip: tip } : {}),
+    };
     try {
       await dbSet(`order:${orderId}`, updatedOrder);
       setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
@@ -320,12 +329,13 @@ export function DeliveryDashboard() {
                       <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{order.address}</p>
                     </div>
 
-                    <div className="flex items-center justify-between border-t pt-3 dark:border-gray-800 mt-4">
-                       <div className="flex flex-col">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Total</p>
-                          <p className="font-bold text-gray-900 dark:text-white">{order.total} EGP</p>
-                       </div>
-                       <Select defaultValue={order.status} onValueChange={(val) => updateOrderStatus(order.id, val as any)}>
+                    <div className="space-y-2 border-t pt-3 dark:border-gray-800 mt-4">
+                       <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Total</p>
+                            <p className="font-bold text-gray-900 dark:text-white">{order.total} EGP</p>
+                          </div>
+                          <Select defaultValue={order.status} onValueChange={(val) => updateOrderStatus(order.id, val as Order["status"])}>
                          <SelectTrigger className="w-[120px] h-9 text-xs">
                            <SelectValue />
                          </SelectTrigger>
@@ -335,6 +345,23 @@ export function DeliveryDashboard() {
                            <SelectItem value="delivered">Delivered</SelectItem>
                          </SelectContent>
                        </Select>
+                       </div>
+                       <div>
+                         <label className="text-[10px] text-gray-500 uppercase font-bold">Delivery tip (EGP)</label>
+                         <Input
+                           type="number"
+                           min="0"
+                           className="h-8 mt-1"
+                           placeholder="0"
+                           value={deliveryTips[order.id] ?? order.deliveryTip ?? ""}
+                           onChange={(e) =>
+                             setDeliveryTips((prev) => ({
+                               ...prev,
+                               [order.id]: parseFloat(e.target.value) || 0,
+                             }))
+                           }
+                         />
+                       </div>
                     </div>
                  </div>
                </motion.div>
