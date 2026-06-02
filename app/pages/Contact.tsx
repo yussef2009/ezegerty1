@@ -7,13 +7,15 @@ import { MapPin, Phone, Mail, Clock, Send } from "lucide-react";
 import { motion } from "motion/react";
 import { useLanguage } from "../context/LanguageContext";
 
+type ContactForm = { name: string; email: string; subject: string; message: string };
+
 export function Contact() {
   const { t } = useLanguage();
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, formState: { errors } } = useForm<ContactForm>();
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const onSubmit = (data: any) => {
-    console.log(data);
+  const onSubmit = (_data: ContactForm) => {
+    console.log(_data);
     setIsSubmitted(true);
   };
 

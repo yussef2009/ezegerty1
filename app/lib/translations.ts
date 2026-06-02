@@ -113,9 +113,15 @@ export const translations = {
       callUs: "Call Us",
       emailUs: "Email Us",
       workingHours: "Working Hours",
+      supportHours: "Sat–Thu 9 AM–9 PM · Fri 2 PM–9 PM",
       address: "123 Corniche Road, Alexandria, Egypt",
       hours: "Saturday - Thursday: 9:00 AM - 10:00 PM",
-      friday: "Friday: 1:00 PM - 10:00 PM"
+      friday: "Friday: 1:00 PM - 10:00 PM",
+      sendMessage: "Send a Message",
+      messageSent: "Message Sent!",
+      messageSentDesc: "Thank you for reaching out. We will get back to you shortly.",
+      sendAnother: "Send Another Message",
+      submit: "Send Message",
     },
     footer: {
       companyDesc: "Premium dry cleaning and laundry services in Alexandria. We bring Kuwaiti standards of excellence to your wardrobe.",
@@ -253,9 +259,15 @@ export const translations = {
       callUs: "اتصل بنا",
       emailUs: "راسلنا",
       workingHours: "ساعات العمل",
+      supportHours: "السبت–الخميس 9 ص–9 م · الجمعة 2 م–9 م",
       address: "123 طريق الكورنيش، الإسكندرية، مصر",
       hours: "السبت - الخميس: 9:00 صباحاً - 10:00 مساءً",
-      friday: "الجمعة: 1:00 مساءً - 10:00 مساءً"
+      friday: "الجمعة: 1:00 مساءً - 10:00 مساءً",
+      sendMessage: "أرسل رسالة",
+      messageSent: "تم إرسال الرسالة!",
+      messageSentDesc: "شكراً لتواصلكم. سنرد عليكم في أقرب وقت.",
+      sendAnother: "إرسال رسالة أخرى",
+      submit: "إرسال",
     },
     footer: {
       companyDesc: "خدمات الغسيل الجاف والغسيل الفاخرة في الإسكندرية. نقدم معايير التميز الكويتية إلى خزانتك.",

@@ -18,11 +18,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   }, [language]);
 
-  const value = {
+  const dir: 'ltr' | 'rtl' = language === 'ar' ? 'rtl' : 'ltr';
+  const value: LanguageContextType = {
     language,
     setLanguage,
     t: translations[language],
-    dir: language === 'ar' ? 'rtl' : 'ltr',
+    dir,
   };
 
   return (

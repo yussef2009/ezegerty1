@@ -14,7 +14,8 @@ import {
   MapPin, 
   Calendar,
   CreditCard,
-  ShoppingBag
+  ShoppingBag,
+  Crown,
 } from "lucide-react";
 import { 
   Dialog, 
@@ -25,8 +26,12 @@ import {
   DialogFooter
 } from "../../components/ui/dialog";
 import { dbGet, dbSet } from "../../lib/db";
-import { Crown } from "lucide-react";
 import { toast } from "sonner";
+
+type UserSubscription = {
+  active?: boolean;
+  planName?: string;
+};
 
 type Client = {
   id: string;
@@ -92,7 +97,7 @@ export function AdminClients() {
     setIsDetailsOpen(true);
     setClientPremium(null);
     try {
-      const sub = await dbGet(`user_subscription:${client.id}`);
+      const sub = (await dbGet(`user_subscription:${client.id}`)) as UserSubscription | null;
       if (sub?.active && sub.planName) setClientPremium(sub.planName);
     } catch {
       /* ignore */
