@@ -55,7 +55,7 @@ export function AdminLayout() {
     { name: "Clients", path: "/admin/clients", icon: Users },
     { name: "Delivery Tracking", path: "/admin/tracking", icon: Truck },
     { name: "Delivery Dashboard", path: "/admin/delivery-dashboard", icon: Truck },
-    { name: "Delivery View", path: "/admin/delivery", icon: Truck },
+    { name: "Assign Deliveries", path: "/admin/delivery", icon: Truck },
     { name: "Services Stats", path: "/admin/services-dashboard", icon: Sparkles },
     { name: "Manage Services", path: "/admin/services", icon: WashingMachine },
     { name: "Premium Plans", path: "/admin/plans", icon: Sparkles },

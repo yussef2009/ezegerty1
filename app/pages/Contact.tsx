@@ -57,7 +57,7 @@ export function Contact() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">{t.contact.callUs}</h3>
-                    <p className="text-gray-600 dark:text-gray-400">+20 123 456 7890</p>
+                    <p className="text-gray-600 dark:text-gray-400">{t.contact.phonePlaceholder || "Contact us for phone number"}</p>
                     <p className="text-sm text-gray-500">{t.contact.supportHours}</p>
                   </div>
                 </div>

@@ -8,6 +8,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Loader2, RefreshCw, TrendingUp, ShoppingBag, Landmark, WashingMachine, Truck, Gift, PieChart } from "lucide-react";
+import { AdminOtherOrdersPanel } from "../../components/admin/AdminOtherOrdersPanel";
 
 interface OrderRecord {
   id: string;
@@ -161,6 +162,8 @@ export function AdminDashboard() {
         />
         <StatCard icon={Landmark} label="Instapay Pending" value={String(stats.instapayPending)} color="purple" />
       </div>
+
+      <AdminOtherOrdersPanel />
 
       {categoryEntries.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">

@@ -11,13 +11,23 @@ type Discount = {
   code: string;
   amount: number;
   type: "percentage" | "fixed";
+  benefitKind?: "percentage" | "fixed" | "free" | "free_pieces" | "free_service" | "priority_delivery";
+  freePieces?: number;
+  description?: string;
 };
 
 export function AdminDiscounts() {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newDiscount, setNewDiscount] = useState({ code: "", amount: "", type: "percentage" as "percentage" | "fixed" });
+  const [newDiscount, setNewDiscount] = useState({
+    code: "",
+    amount: "",
+    type: "percentage" as "percentage" | "fixed",
+    benefitKind: "percentage" as Discount["benefitKind"],
+    freePieces: "",
+    description: "",
+  });
 
   const fetchDiscounts = async () => {
     setLoading(true);
@@ -38,14 +48,17 @@ export function AdminDiscounts() {
     const newItem: Discount = {
       id: Math.random().toString(36).substr(2, 9),
       code: newDiscount.code.toUpperCase(),
-      amount: parseFloat(newDiscount.amount),
-      type: newDiscount.type
+      amount: parseFloat(newDiscount.amount) || 0,
+      type: newDiscount.type,
+      benefitKind: newDiscount.benefitKind,
+      freePieces: newDiscount.freePieces ? parseInt(newDiscount.freePieces, 10) : undefined,
+      description: newDiscount.description || undefined,
     };
     const updated = [...discounts, newItem];
     try {
       await dbSet("discounts", updated);
       setDiscounts(updated);
-      setNewDiscount({ code: "", amount: "", type: "percentage" });
+      setNewDiscount({ code: "", amount: "", type: "percentage", benefitKind: "percentage", freePieces: "", description: "" });
       setIsAdding(false);
       toast.success("Promo code created!");
     } catch (e) {
@@ -96,14 +109,39 @@ export function AdminDiscounts() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Discount Type</label>
               <select 
-                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                 value={newDiscount.type}
-                onChange={(e: any) => setNewDiscount({...newDiscount, type: e.target.value})}
+                onChange={(e) => setNewDiscount({...newDiscount, type: e.target.value as "percentage" | "fixed"})}
               >
                 <option value="percentage">Percentage (%)</option>
                 <option value="fixed">Fixed Amount (EGP)</option>
               </select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Benefit kind</label>
+            <select
+              className="flex h-12 w-full rounded-md border px-3 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              value={newDiscount.benefitKind}
+              onChange={(e) => setNewDiscount({ ...newDiscount, benefitKind: e.target.value as Discount["benefitKind"] })}
+            >
+              <option value="percentage">% discount on order</option>
+              <option value="fixed">Fixed EGP off order</option>
+              <option value="free">100% free order</option>
+              <option value="free_pieces">Free pieces (enter count below)</option>
+              <option value="free_service">Free service</option>
+              <option value="priority_delivery">Priority / first delivery</option>
+            </select>
+          </div>
+          {newDiscount.benefitKind === "free_pieces" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Free pieces count</label>
+              <Input type="number" min={1} value={newDiscount.freePieces} onChange={(e) => setNewDiscount({ ...newDiscount, freePieces: e.target.value })} />
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description (optional)</label>
+            <Input value={newDiscount.description} onChange={(e) => setNewDiscount({ ...newDiscount, description: e.target.value })} placeholder="Shown to staff" />
           </div>
           <Button onClick={handleAdd} className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700">
             Generate Code
@@ -150,7 +188,10 @@ export function AdminDiscounts() {
                 <TableRow key={d.id} className="hover:bg-gray-50/30 dark:hover:bg-gray-800/30">
                   <TableCell className="font-mono font-bold py-4 text-lg tracking-wider text-blue-600 dark:text-blue-400">{d.code}</TableCell>
                   <TableCell className="font-semibold text-gray-900 dark:text-white">{d.amount}{d.type === 'percentage' ? '%' : ' EGP'}</TableCell>
-                  <TableCell className="capitalize text-gray-500">{d.type}</TableCell>
+                  <TableCell className="capitalize text-gray-500 text-xs">
+                    {d.benefitKind || d.type}
+                    {d.freePieces ? ` · ${d.freePieces} pcs` : ""}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" className="text-red-500 hover:bg-red-50" onClick={() => handleDelete(d.id)}>
                       <Trash2 className="h-4 w-4" />

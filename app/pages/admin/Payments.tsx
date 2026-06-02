@@ -7,6 +7,8 @@ import { Input } from "../../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Loader2, RefreshCw, Check, X, Landmark, Receipt, AlertCircle, Tag } from "lucide-react";
 import { toast } from "sonner";
+import { publishOtherPriceToClient } from "../../lib/otherOrderPricing";
+import { useLanguage } from "../../context/LanguageContext";
 
 type OrderItem = {
   serviceId: string;
@@ -30,6 +32,8 @@ type Order = {
 };
 
 export function AdminPayments() {
+  const { t } = useLanguage();
+  const a = t.admin;
   const [orders, setOrders] = useState<Order[]>([]);
   const [otherOrders, setOtherOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,24 +69,10 @@ export function AdminPayments() {
       toast.error("Enter a valid price");
       return;
     }
-    let updated: Order = { ...order, total: finalTotal, paymentStatus: order.paymentStatus || "pending" };
-    if (updated.items?.length) {
-      const otherIndexes = updated.items.map((item, i) => (item.isOther ? i : -1)).filter((i) => i >= 0);
-      if (otherIndexes.length === 1) {
-        const idx = otherIndexes[0];
-        const catalogSubtotal = updated.items
-          .filter((item) => !item.isOther)
-          .reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const otherLineTotal = Math.max(0, finalTotal - catalogSubtotal);
-        updated.items = updated.items.map((item, i) =>
-          i === idx ? { ...item, price: otherLineTotal } : item
-        );
-      }
-    }
     try {
-      await dbSet(`order:${orderId}`, updated);
-      setOtherOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
-      toast.success("Price saved for Other item");
+      const updated = await publishOtherPriceToClient(order as import("../../lib/orderTypes").OrderRecord, finalTotal);
+      setOtherOrders((prev) => prev.filter((o) => o.id !== orderId));
+      toast.success(a.priceSent || "Price sent to client for payment choice");
     } catch {
       toast.error("Save failed");
     }
@@ -198,7 +188,7 @@ export function AdminPayments() {
                         />
                       </div>
                       <Button className="bg-orange-600 hover:bg-orange-700" onClick={() => saveOtherPrice(order.id)}>
-                        Save Price
+                        {a.sendPriceToClient || "Send price to client"}
                       </Button>
                     </div>
                   </div>

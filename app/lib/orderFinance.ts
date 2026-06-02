@@ -3,6 +3,8 @@ export type Discount = {
   code: string;
   amount: number;
   type: "percentage" | "fixed";
+  benefitKind?: "percentage" | "fixed" | "free" | "free_pieces" | "free_service" | "priority_delivery";
+  freePieces?: number;
 };
 
 export type OrderItem = {
@@ -17,7 +19,9 @@ export type OrderItem = {
 
 export function applyCoupon(subtotal: number, discount: Discount | null): number {
   if (!discount || subtotal <= 0) return subtotal;
-  if (discount.type === "percentage") {
+  const kind = discount.benefitKind || discount.type;
+  if (kind === "free") return 0;
+  if (kind === "percentage" || discount.type === "percentage") {
     return Math.max(0, subtotal - (subtotal * discount.amount) / 100);
   }
   return Math.max(0, subtotal - discount.amount);

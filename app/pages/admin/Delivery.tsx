@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { dbSet, dbGetByPrefix } from "../../lib/db";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { listDeliveryDrivers } from "../../lib/deliveryProfile";
+import type { OrderRecord } from "../../lib/orderTypes";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Loader2, RefreshCw, CheckCircle2, Truck, Phone, MapPin, Package, UserPlus } from "lucide-react";
+import { Loader2, RefreshCw, Truck, Phone, MapPin, Package, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "../../context/LanguageContext";
 import {
   Dialog,
   DialogContent,
@@ -14,74 +16,88 @@ import {
 } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-
-type Order = {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  status: "pending" | "cleaning" | "ready" | "delivered";
-  total: number;
-  createdAt: string;
-  items: any[];
-};
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 
 export function AdminDelivery() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { t } = useLanguage();
+  const a = t.admin;
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [drivers, setDrivers] = useState<{ userId: string; name: string; phone: string; photoUrl?: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAddingDriver, setIsAddingDriver] = useState(false);
-  const [driverForm, setDriverForm] = useState({ name: "", email: "", password: "" });
+  const [assignDriverId, setAssignDriverId] = useState<Record<string, string>>({});
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [driverForm, setDriverForm] = useState({ name: "", phone: "", email: "" });
 
-  const fetchDeliveryOrders = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const values = await dbGetByPrefix("order:");
-      const deliveryOrders = values.filter((o: Order) => o.status === 'ready' || o.status === 'delivered');
-      setOrders(deliveryOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    } catch (error) {
-      toast.error("Failed to fetch delivery tasks");
+      const values = (await dbGetByPrefix("order:")) as OrderRecord[];
+      const deliveryOrders = values.filter((o) =>
+        ["ready", "delivering", "cleaning"].includes(o.status)
+      );
+      deliveryOrders.sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime());
+      setOrders(deliveryOrders);
+      setDrivers(await listDeliveryDrivers());
+    } catch {
+      toast.error("Failed to load delivery data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDeliveryOrders();
+    fetchData();
   }, []);
 
-  const markAsDelivered = async (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
+  const assignOrder = async (orderId: string) => {
+    const driverUserId = assignDriverId[orderId];
+    const driver = drivers.find((d) => d.userId === driverUserId);
+    if (!driver) {
+      toast.error(a.selectDriver || "Select a driver");
+      return;
+    }
+    const order = orders.find((o) => o.id === orderId);
     if (!order) return;
-    const updatedOrder: Order = { ...order, status: "delivered" };
+    const updated: OrderRecord = {
+      ...order,
+      assignedDriverUserId: driver.userId,
+      assignedDriverName: driver.name,
+      assignedDriverPhone: driver.phone,
+      status: order.status === "cleaning" ? "ready" : order.status,
+    };
     try {
-      await dbSet(`order:${orderId}`, updatedOrder);
-      setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
-      toast.success("Order marked as delivered");
-    } catch (error) {
-      toast.error("Update failed");
+      await dbSet(`order:${orderId}`, updated);
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+      toast.success(`${a.assignOrder}: ${driver.name}`);
+    } catch {
+      toast.error("Assign failed");
     }
   };
 
-  const handleAddDriver = async (e: React.FormEvent) => {
+  const registerDriverHint = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsAddingDriver(true);
+    const id = `driver_${Date.now()}`;
     try {
-      const driverId = `driver_${Date.now()}`;
-      await dbSet(`driver:${driverId}`, {
-        id: driverId,
+      await dbSet(`delivery_profile:${id}`, {
+        userId: id,
         name: driverForm.name,
+        phone: driverForm.phone,
         email: driverForm.email,
-        role: "delivery",
-        createdAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
-      toast.success("Delivery driver added successfully");
+      const list = await listDeliveryDrivers();
+      setDrivers(list);
       setIsDialogOpen(false);
-      setDriverForm({ name: "", email: "", password: "" });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to add driver");
-    } finally {
-      setIsAddingDriver(false);
+      setDriverForm({ name: "", phone: "", email: "" });
+      toast.success("Driver registered — they should log in and complete profile with photo");
+    } catch {
+      toast.error("Failed to register");
     }
   };
 
@@ -89,121 +105,128 @@ export function AdminDelivery() {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Delivery Dashboard</h1>
-          <p className="text-gray-500 text-sm">Manage active deliveries and driver tasks</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Assign delivery orders</h1>
+          <p className="text-gray-500 text-sm">
+            Assign ready orders to drivers. Drivers see only their assignments on the delivery dashboard.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex gap-2">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700">
                 <UserPlus className="h-4 w-4" />
-                Add Delivery Driver
+                Register driver
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Delivery Driver</DialogTitle>
+                <DialogTitle>Register delivery driver</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleAddDriver} className="space-y-4 mt-4">
+              <form onSubmit={registerDriverHint} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input 
-                    id="name" 
-                    required 
+                  <Label>Name</Label>
+                  <Input
+                    required
                     value={driverForm.name}
                     onChange={(e) => setDriverForm({ ...driverForm, name: e.target.value })}
-                    placeholder="Ahmed Hassan" 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    required 
+                  <Label>Phone</Label>
+                  <Input
+                    required
+                    value={driverForm.phone}
+                    onChange={(e) => setDriverForm({ ...driverForm, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email (optional)</Label>
+                  <Input
+                    type="email"
                     value={driverForm.email}
                     onChange={(e) => setDriverForm({ ...driverForm, email: e.target.value })}
-                    placeholder="driver@ezgerty.com" 
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    required 
-                    value={driverForm.password}
-                    onChange={(e) => setDriverForm({ ...driverForm, password: e.target.value })}
-                    placeholder="Min 6 characters" 
-                    minLength={6}
-                  />
-                </div>
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isAddingDriver}>
-                  {isAddingDriver ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Create Account
+                <Button type="submit" className="w-full">
+                  Save
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
-
-          <Button onClick={fetchDeliveryOrders} variant="outline" size="sm" className="gap-2 h-10">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          <Button onClick={fetchData} variant="outline" size="sm" className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          <div className="col-span-full flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="col-span-full text-center py-20 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-dashed">
-            <Truck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium">No active deliveries</h3>
-            <p className="text-gray-500">All caught up! New ready orders will appear here.</p>
-          </div>
-        ) : orders.map((order) => (
-          <div key={order.id} className="bg-white dark:bg-gray-900 rounded-2xl border dark:border-gray-800 p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'} className="px-3 py-1">
-                {order.status === 'ready' ? 'READY FOR DELIVERY' : 'DELIVERED'}
-              </Badge>
-              <span className="text-xs font-mono text-gray-400">#{order.id.slice(-6)}</span>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-gray-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">{order.name}</p>
-                  <p className="text-sm text-gray-500 line-clamp-2">{order.address}</p>
-                </div>
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-20 border border-dashed rounded-2xl">
+          <Truck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-500">No orders ready for delivery assignment</p>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          {orders.map((order) => (
+            <div
+              key={order.id}
+              className="bg-white dark:bg-gray-900 rounded-2xl border dark:border-gray-800 p-6 shadow-sm"
+            >
+              <div className="flex justify-between mb-4">
+                <Badge>{order.status.toUpperCase()}</Badge>
+                <span className="text-xs font-mono text-gray-400">#{order.id.slice(-6)}</span>
               </div>
-
-              <div className="flex items-center gap-3">
-                <Phone className="h-5 w-5 text-gray-400 shrink-0" />
-                <a href={`tel:${order.phone}`} className="text-blue-600 hover:underline font-medium">{order.phone}</a>
+              <div className="space-y-3 text-sm">
+                <p className="font-bold text-lg">{order.name}</p>
+                <p className="flex items-center gap-2 text-gray-600">
+                  <Phone className="h-4 w-4" /> {order.phone}
+                </p>
+                <p className="flex items-start gap-2 text-gray-600">
+                  <MapPin className="h-4 w-4 shrink-0 mt-0.5" /> {order.address}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Package className="h-4 w-4" /> {order.items?.length || 0} items · {order.total} EGP
+                </p>
+                {order.assignedDriverName && (
+                  <p className="text-blue-600 font-medium">
+                    Assigned: {order.assignedDriverName} ({order.assignedDriverPhone})
+                  </p>
+                )}
               </div>
-
-              <div className="flex items-center gap-3">
-                <Package className="h-5 w-5 text-gray-400 shrink-0" />
-                <p className="text-sm font-medium">{order.items?.length || 0} Items • {order.total} EGP</p>
-              </div>
-
-              {order.status === 'ready' && (
-                <Button 
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-11"
-                  onClick={() => markAsDelivered(order.id)}
+              <div className="mt-4 flex gap-2">
+                <Select
+                  value={assignDriverId[order.id] || order.assignedDriverUserId || ""}
+                  onValueChange={(v) => setAssignDriverId((prev) => ({ ...prev, [order.id]: v }))}
                 >
-                  <CheckCircle2 className="mr-2 h-5 w-5" /> Mark as Delivered
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder={a.selectDriver} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {drivers.length === 0 ? (
+                      <SelectItem value="_none" disabled>
+                        No drivers yet — drivers save profile on first login
+                      </SelectItem>
+                    ) : (
+                      drivers.map((dr) => (
+                        <SelectItem key={dr.userId} value={dr.userId}>
+                          {dr.name} · {dr.phone}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => assignOrder(order.id)} className="bg-blue-600 hover:bg-blue-700">
+                  {a.assignDriver}
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

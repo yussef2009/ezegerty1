@@ -90,7 +90,7 @@ export function AdminTracking() {
 
   useEffect(() => {
     fetchLiveLocations();
-    const interval = setInterval(fetchLiveLocations, 8000);
+    const interval = setInterval(fetchLiveLocations, 3000);
     return () => clearInterval(interval);
   }, [fetchLiveLocations]);
 

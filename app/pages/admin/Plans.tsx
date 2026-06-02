@@ -12,13 +12,28 @@ type Plan = {
   price: number;
   interval: "weekly" | "monthly" | "yearly" | "pieces";
   features: string;
+  discountPercent?: number;
+  freePieces?: number;
+  freeServices?: number;
+  priorityDelivery?: boolean;
+  firstDeliveryFree?: boolean;
 };
 
 export function AdminPlans() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newPlan, setNewPlan] = useState({ name: "", price: "", interval: "monthly", features: "" });
+  const [newPlan, setNewPlan] = useState({
+    name: "",
+    price: "",
+    interval: "monthly",
+    features: "",
+    discountPercent: "",
+    freePieces: "",
+    freeServices: "",
+    priorityDelivery: false,
+    firstDeliveryFree: false,
+  });
 
   const fetchPlans = async () => {
     setLoading(true);
@@ -41,13 +56,28 @@ export function AdminPlans() {
       name: newPlan.name,
       price: parseFloat(newPlan.price),
       interval: newPlan.interval as Plan["interval"],
-      features: newPlan.features
+      features: newPlan.features,
+      discountPercent: newPlan.discountPercent ? parseFloat(newPlan.discountPercent) : undefined,
+      freePieces: newPlan.freePieces ? parseInt(newPlan.freePieces, 10) : undefined,
+      freeServices: newPlan.freeServices ? parseInt(newPlan.freeServices, 10) : undefined,
+      priorityDelivery: newPlan.priorityDelivery,
+      firstDeliveryFree: newPlan.firstDeliveryFree,
     };
     const updated = [...plans, newItem];
     try {
       await dbSet("plans", updated);
       setPlans(updated);
-      setNewPlan({ name: "", price: "", interval: "monthly", features: "" });
+      setNewPlan({
+        name: "",
+        price: "",
+        interval: "monthly",
+        features: "",
+        discountPercent: "",
+        freePieces: "",
+        freeServices: "",
+        priorityDelivery: false,
+        firstDeliveryFree: false,
+      });
       setIsAdding(false);
       toast.success("Subscription plan created");
     } catch (e) {
@@ -109,10 +139,34 @@ export function AdminPlans() {
               onChange={e => setNewPlan({...newPlan, price: e.target.value})}
             />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Extra discount %</label>
+              <Input type="number" min={0} max={100} value={newPlan.discountPercent} onChange={(e) => setNewPlan({ ...newPlan, discountPercent: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Free pieces / month</label>
+              <Input type="number" min={0} value={newPlan.freePieces} onChange={(e) => setNewPlan({ ...newPlan, freePieces: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Free services / month</label>
+              <Input type="number" min={0} value={newPlan.freeServices} onChange={(e) => setNewPlan({ ...newPlan, freeServices: e.target.value })} />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={newPlan.priorityDelivery} onChange={(e) => setNewPlan({ ...newPlan, priorityDelivery: e.target.checked })} />
+              Priority delivery
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={newPlan.firstDeliveryFree} onChange={(e) => setNewPlan({ ...newPlan, firstDeliveryFree: e.target.checked })} />
+              First delivery free
+            </label>
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Included Features</label>
             <Input 
-              placeholder="e.g. Unlimited pickup, 10% off, Priority support" 
+              placeholder="One feature per line" 
               className="h-12"
               value={newPlan.features} 
               onChange={e => setNewPlan({...newPlan, features: e.target.value})}
@@ -165,8 +219,17 @@ export function AdminPlans() {
                <span className="text-gray-500 ml-1">EGP / {p.interval}</span>
             </div>
             
+            {(p.discountPercent || p.freePieces || p.priorityDelivery) && (
+              <p className="text-xs text-blue-600 mb-2">
+                {p.discountPercent ? `${p.discountPercent}% off · ` : ""}
+                {p.freePieces ? `${p.freePieces} free pieces · ` : ""}
+                {p.freeServices ? `${p.freeServices} free services · ` : ""}
+                {p.priorityDelivery ? "Priority delivery · " : ""}
+                {p.firstDeliveryFree ? "First delivery free" : ""}
+              </p>
+            )}
             <ul className="space-y-3 mb-8">
-              {p.features.split(',').map((f, i) => (
+              {p.features.split(/\n|,/).filter(Boolean).map((f, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                   {f.trim()}
