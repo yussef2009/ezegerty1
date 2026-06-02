@@ -37,12 +37,21 @@ export function AdminLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    if (!loading && (!user || role !== "admin") && !devBypass) {
+    if (loading || devBypass) return;
+    if (!user) {
       navigate("/admin-login");
+      return;
+    }
+    if (role === "delivery") {
+      navigate("/delivery/dashboard");
+      return;
+    }
+    if (role !== "admin") {
+      navigate("/client/dashboard");
     }
   }, [user, role, loading, navigate, devBypass]);
 
-  if (!devBypass && (loading || (!user || role !== "admin"))) {
+  if (!devBypass && (loading || !user || role !== "admin")) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

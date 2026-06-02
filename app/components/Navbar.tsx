@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useTheme } from "next-themes";
-import { Menu, X, Sun, Moon, User, Settings, History, LogOut, LayoutDashboard, Truck } from "lucide-react";
+import { Menu, X, Sun, Moon, Settings, History, LogOut, LayoutDashboard, Truck, LayoutGrid } from "lucide-react";
+import { ClientNotificationBell } from "./ClientNotificationBell";
 import { Button } from "./ui/button";
 import { cn } from "../../lib/utils";
 const logo = "/logo.png";
@@ -83,6 +84,8 @@ export function Navbar() {
               <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               <span className="sr-only">Toggle theme</span>
             </Button>
+
+            {user && role !== "admin" && role !== "delivery" && <ClientNotificationBell />}
             
             {user ? (
               <DropdownMenu>
@@ -97,13 +100,19 @@ export function Navbar() {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {role === 'admin' && (
+                  {role !== "admin" && role !== "delivery" && (
+                    <DropdownMenuItem onClick={() => navigate("/client/dashboard")}>
+                      <LayoutGrid className="mr-2 h-4 w-4" />
+                      My Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  {role === "admin" && (
                     <DropdownMenuItem onClick={() => navigate("/admin/dashboard")}>
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       Admin Dashboard
                     </DropdownMenuItem>
                   )}
-                  {role === 'delivery' && (
+                  {role === "delivery" && (
                     <DropdownMenuItem onClick={() => navigate("/delivery/dashboard")}>
                       <Truck className="mr-2 h-4 w-4" />
                       Delivery App
@@ -189,6 +198,13 @@ export function Navbar() {
             ))}
             {user ? (
                <div className="grid gap-2 border-t pt-4 dark:border-gray-800">
+                 {role !== "admin" && role !== "delivery" && (
+                   <Link to="/client/dashboard" onClick={() => setIsOpen(false)}>
+                     <Button variant="ghost" className="w-full justify-start gap-2">
+                       <LayoutGrid className="h-4 w-4" /> My Dashboard
+                     </Button>
+                   </Link>
+                 )}
                  <Link to="/client/history" onClick={() => setIsOpen(false)}>
                    <Button variant="ghost" className="w-full justify-start gap-2">
                      <History className="h-4 w-4" /> Order History

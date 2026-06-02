@@ -79,6 +79,10 @@ function resolveRoleForPortal(
     if (isAdminEmail(email)) return "admin";
     return currentRole;
   }
+  if (portal === "client") {
+    // Client login never grants admin/delivery (even if email is on allowlist)
+    return "client";
+  }
   if (!currentRole && portalPendingRole) return portalPendingRole;
   return currentRole;
 }
@@ -156,12 +160,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const portal = oauthPending?.portal ?? sessionStorage.getItem(AUTH_PORTAL_KEY);
         const rawPendingRole = oauthPending?.role ?? null;
         const pendingRole = getPendingRoleForPortal(portal, rawPendingRole);
-        const targetRole = resolveRoleForPortal(
+        let targetRole = resolveRoleForPortal(
           currentRole,
           portal,
           rawPendingRole,
           currentUser.email
         );
+        if (portal === "client") {
+          targetRole = "client";
+        }
         const pendingName =
           currentUser.user_metadata?.full_name ||
           currentUser.user_metadata?.name ||
@@ -225,12 +232,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!error && data.user) {
       const currentRole = data.user.user_metadata?.role ?? null;
-      const targetRole = resolveRoleForPortal(
+      let targetRole = resolveRoleForPortal(
         currentRole,
         portal,
         null,
         data.user.email
       );
+      if (portal === "client") {
+        targetRole = "client";
+      }
 
       if (targetRole && targetRole !== currentRole) {
         const name =

@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { motion } from "motion/react";
 
 export function ClientSettings() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
@@ -22,6 +22,10 @@ export function ClientSettings() {
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/client-login");
+    if (!authLoading && user && (role === "admin" || role === "delivery")) {
+      navigate(role === "admin" ? "/admin/dashboard" : "/delivery/dashboard");
+      return;
+    }
     if (user) {
       setFormData({
         name: user.user_metadata?.name || "",

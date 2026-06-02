@@ -174,6 +174,10 @@ export const translations = {
       noNotifications: "No new notifications",
       totalOrders: "Total orders",
       totalSpent: "Total spent",
+      viewAll: "View all on dashboard",
+      notificationsActive: "Notifications are on — alerts appear here and in the bell icon",
+      newAlerts: "new",
+      dismiss: "Dismiss",
     },
     admin: {
       assignDriver: "Assign to driver",
@@ -365,6 +369,10 @@ export const translations = {
       noNotifications: "لا إشعارات جديدة",
       totalOrders: "إجمالي الطلبات",
       totalSpent: "إجمالي الإنفاق",
+      viewAll: "عرض الكل في لوحة التحكم",
+      notificationsActive: "الإشعارات مفعّلة — تظهر هنا وعلى أيقونة الجرس",
+      newAlerts: "جديد",
+      dismiss: "تجاهل",
     },
     admin: {
       assignDriver: "إسناد لسائق",

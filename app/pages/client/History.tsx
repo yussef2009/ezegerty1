@@ -19,14 +19,17 @@ type Order = {
 };
 
 export function ClientHistory() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/client-login");
-  }, [user, authLoading, navigate]);
+    if (!authLoading && user && (role === "admin" || role === "delivery")) {
+      navigate(role === "admin" ? "/admin/dashboard" : "/delivery/dashboard");
+    }
+  }, [user, role, authLoading, navigate]);
 
   const fetchOrders = async () => {
     if (!user) return;

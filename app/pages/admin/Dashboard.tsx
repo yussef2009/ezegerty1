@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { dbSet, dbGetByPrefix, dbGet } from "../../lib/db";
+import { notifyOrderStatusChange } from "../../lib/notifications";
 import { revenueFromOrder, categoryRevenue, type OrderItem } from "../../lib/orderFinance";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
@@ -93,8 +94,14 @@ export function AdminDashboard() {
     if (!order || !isValidStatus(newStatus)) return;
     const updatedOrder = { ...order, status: newStatus };
     try {
+      const full = (await dbGetByPrefix("order:")).find((o: { id?: string }) => o.id === orderId) as {
+        userId?: string;
+      } | undefined;
       await dbSet(`order:${orderId}`, updatedOrder);
       setOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder : o)));
+      if (full?.userId && newStatus !== order.status) {
+        await notifyOrderStatusChange(full.userId, orderId, newStatus);
+      }
     } catch (error) {
       console.error("Error updating status:", error);
     }

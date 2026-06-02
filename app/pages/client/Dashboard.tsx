@@ -2,29 +2,33 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { dbGet, dbGetByPrefix } from "../../lib/db";
-import type { AppNotification } from "../../lib/notifications";
 import type { OrderRecord } from "../../lib/orderTypes";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Loader2, Package, LogOut, Clock, CreditCard, Bell } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { ClientOtherPaymentCard } from "../../components/ClientOtherPaymentCard";
+import { useClientNotifications } from "../../hooks/useClientNotifications";
+import { markNotificationRead } from "../../lib/notifications";
 
 export function ClientDashboard() {
   const { t } = useLanguage();
   const c = t.client;
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, role, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [instapayNumber, setInstapayNumber] = useState("");
   const [loading, setLoading] = useState(true);
+  const { unread, unreadCount, refresh: refreshNotifications } = useClientNotifications(user?.id, 8000);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/client-login");
-  }, [user, authLoading, navigate]);
+    if (!authLoading && user && (role === "admin" || role === "delivery")) {
+      navigate(role === "admin" ? "/admin/dashboard" : "/delivery/dashboard");
+    }
+  }, [user, role, authLoading, navigate]);
 
-  const fetchData = async () => {
+  const fetchOrders = async () => {
     if (!user) return;
     setLoading(true);
     try {
@@ -32,9 +36,6 @@ export function ClientDashboard() {
       const myOrders = values.filter((o) => o.userId === user.id || o.userEmail === user.email);
       myOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(myOrders);
-
-      const notifs = ((await dbGet(`notifications:${user.id}`)) as AppNotification[] | null) || [];
-      setNotifications(notifs.filter((n) => !n.read));
 
       const instapay = await dbGet("instapay_account");
       if (instapay?.number) setInstapayNumber(instapay.number);
@@ -46,14 +47,22 @@ export function ClientDashboard() {
   };
 
   useEffect(() => {
-    if (user) fetchData();
-    const interval = setInterval(fetchData, 15000);
-    return () => clearInterval(interval);
-  }, [user]);
+    if (user && role !== "admin" && role !== "delivery") {
+      fetchOrders();
+      const interval = setInterval(fetchOrders, 12000);
+      return () => clearInterval(interval);
+    }
+  }, [user, role]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const dismissNotification = async (id: string) => {
+    if (!user) return;
+    await markNotificationRead(user.id, id);
+    await refreshNotifications();
   };
 
   const awaitingPaymentOrders = orders.filter((o) => o.awaitingClientPayment && o.otherPriceSet);
@@ -70,17 +79,27 @@ export function ClientDashboard() {
     .filter((o) => o.paymentStatus === "confirmed" || o.paymentMethod === "cash")
     .reduce((acc, o) => acc + (o.total || 0), 0);
 
+  const otherUnread = unread.filter(
+    (n) => n.type !== "other_price_ready" || !awaitingPaymentOrders.some((o) => o.id === n.orderId)
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 dark:bg-gray-950">
       <div className="container mx-auto max-w-5xl px-4">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-2xl shadow-sm border dark:bg-gray-900 dark:border-gray-800">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center justify-between bg-white p-6 rounded-2xl shadow-sm border dark:bg-gray-900 dark:border-gray-800">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Welcome, {user.user_metadata?.name || "Customer"}!
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">Manage orders and payment notifications</p>
+            <p className="text-gray-600 dark:text-gray-400">{c.notificationsActive || "Notifications are on — you'll be alerted here"}</p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 items-center">
+            {unreadCount > 0 && (
+              <Badge className="bg-orange-500 text-white px-3 py-1">
+                <Bell className="h-3 w-3 mr-1 inline" />
+                {unreadCount} {c.newAlerts || "new"}
+              </Badge>
+            )}
             <Button variant="outline" onClick={() => navigate("/client/account-request")}>
               Business Account
             </Button>
@@ -95,13 +114,18 @@ export function ClientDashboard() {
           </div>
         </div>
 
-        {(notifications.length > 0 || awaitingPaymentOrders.length > 0) && (
-          <div className="mb-8 space-y-4">
+        <div className="mb-8 rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 shadow-sm overflow-hidden">
+          <div className="p-4 border-b dark:border-gray-800 flex items-center justify-between bg-orange-50/50 dark:bg-orange-900/10">
             <h2 className="font-bold flex items-center gap-2 text-gray-900 dark:text-white">
               <Bell className="h-5 w-5 text-orange-500" /> {c.notifications}
             </h2>
+            <Button variant="ghost" size="sm" onClick={() => { fetchOrders(); refreshNotifications(); }}>
+              Refresh
+            </Button>
+          </div>
+          <div className="p-4 space-y-4">
             {awaitingPaymentOrders.map((order) => {
-              const ntf = notifications.find((n) => n.orderId === order.id && n.type === "other_price_ready");
+              const ntf = unread.find((n) => n.orderId === order.id && n.type === "other_price_ready");
               return (
                 <ClientOtherPaymentCard
                   key={order.id}
@@ -109,20 +133,40 @@ export function ClientDashboard() {
                   userId={user.id}
                   notificationId={ntf?.id}
                   instapayNumber={instapayNumber}
-                  onPaid={fetchData}
+                  onPaid={() => {
+                    fetchOrders();
+                    refreshNotifications();
+                  }}
                 />
               );
             })}
-            {notifications
-              .filter((n) => n.type !== "other_price_ready" || !awaitingPaymentOrders.some((o) => o.id === n.orderId))
-              .map((n) => (
-                <div key={n.id} className="rounded-lg border bg-white p-4 dark:bg-gray-900 dark:border-gray-800">
-                  <p className="font-medium">{n.title}</p>
-                  <p className="text-sm text-gray-500">{n.message}</p>
+            {otherUnread.map((n) => (
+              <div
+                key={n.id}
+                className="rounded-lg border border-blue-100 bg-blue-50/50 p-4 dark:bg-blue-900/10 dark:border-blue-800 flex justify-between gap-3"
+              >
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">{n.title}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{n.message}</p>
+                  <p className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
                 </div>
-              ))}
+                <div className="flex flex-col gap-2 shrink-0">
+                  {n.orderId && (
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/track?id=${n.orderId}`)}>
+                      Track
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => dismissNotification(n.id)}>
+                    {c.dismiss || "Dismiss"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {unreadCount === 0 && awaitingPaymentOrders.length === 0 && (
+              <p className="text-center text-gray-500 py-6 text-sm">{c.noNotifications}</p>
+            )}
           </div>
-        )}
+        </div>
 
         <div className="grid gap-6 md:grid-cols-2 mb-8">
           <div className="bg-blue-600 text-white p-6 rounded-2xl shadow-lg">
@@ -140,7 +184,7 @@ export function ClientDashboard() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Clock className="h-5 w-5 text-blue-600" /> Order History
             </h2>
-            <Button variant="ghost" size="sm" onClick={fetchData} className="text-blue-600">
+            <Button variant="ghost" size="sm" onClick={fetchOrders} className="text-blue-600">
               Refresh
             </Button>
           </div>
@@ -163,7 +207,7 @@ export function ClientDashboard() {
                 <div key={order.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/30">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-mono text-xs font-bold bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                           #{order.id.slice(-8)}
                         </span>

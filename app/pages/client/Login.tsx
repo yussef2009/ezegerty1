@@ -21,13 +21,9 @@ export function ClientLogin() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      if (role === "admin") {
-        navigate("/admin/dashboard");
-      } else {
-        navigate("/client/dashboard");
-      }
+      navigate("/client/dashboard");
     }
-  }, [user, role, authLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   const onSubmit = async (data: any) => {
     setLoading(true);
