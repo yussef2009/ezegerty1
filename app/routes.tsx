@@ -15,11 +15,12 @@ import { AdminPlans } from "./pages/admin/Plans";
 import { AdminServices } from "./pages/admin/Services";
 import { AdminTracking } from "./pages/admin/Tracking";
 import { AdminDelivery } from "./pages/admin/Delivery";
-import { AdminDeliveryDashboard } from "./pages/admin/AdminDeliveryDashboard";
 import { AdminServicesDashboard } from "./pages/admin/ServicesDashboard";
 import { AdminPayments } from "./pages/admin/Payments";
 import { AdminBusinessRequests } from "./pages/admin/BusinessRequests";
 import { AdminSettings } from "./pages/admin/Settings";
+import { StaffPortalChoice } from "./pages/staff/PortalChoice";
+import { DeliveryLayout } from "./pages/delivery/DeliveryLayout";
 import { Tracker } from "./pages/Tracker";
 import { ClientLogin } from "./pages/client/Login";
 import { ClientSignup } from "./pages/client/Signup";
@@ -51,6 +52,10 @@ export const router = createBrowserRouter([
     Component: Entry,
   },
   {
+    path: "/staff/portal",
+    Component: StaffPortalChoice,
+  },
+  {
     path: "/admin",
     Component: AdminLayout,
     children: [
@@ -61,7 +66,6 @@ export const router = createBrowserRouter([
       { path: "services", Component: AdminServices },
       { path: "tracking", Component: AdminTracking },
       { path: "delivery", Component: AdminDelivery },
-      { path: "delivery-dashboard", Component: AdminDeliveryDashboard },
       { path: "services-dashboard", Component: AdminServicesDashboard },
       { path: "payments", Component: AdminPayments },
       { path: "business-requests", Component: AdminBusinessRequests },
@@ -77,6 +81,11 @@ export const router = createBrowserRouter([
     Component: ClientSignup,
   },
   {
+    path: "/delivery",
+    Component: DeliveryLayout,
+    children: [{ path: "dashboard", Component: DeliveryDashboard }],
+  },
+  {
     Component: Root,
     children: [
       { index: true, Component: Home },
@@ -90,7 +99,6 @@ export const router = createBrowserRouter([
       { path: "client/settings", Component: ClientSettings },
       { path: "client/history", Component: ClientHistory },
       { path: "client/account-request", Component: ClientAccountRequest },
-      { path: "delivery/dashboard", Component: DeliveryDashboard },
       { path: "*", Component: Home },
     ],
   },

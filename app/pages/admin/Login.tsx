@@ -7,12 +7,11 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { useAuth, prepareAuthPortal } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 export function AdminLogin() {
   const { signIn, signInWithGoogle, user, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit } = useForm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,13 +21,11 @@ export function AdminLogin() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      if (role === "delivery") {
-        navigate("/delivery/dashboard");
-      } else if (role === "admin") {
-        navigate("/admin/dashboard");
+      if (role === "admin" || role === "delivery") {
+        navigate("/staff/portal");
       } else {
         setError(
-          "This account does not have admin access. Use an admin account, sign in with Google from this page, or add your email to VITE_ADMIN_EMAILS."
+          "This account does not have staff access. Use an admin/delivery account or add your email to VITE_ADMIN_EMAILS."
         );
         setLoading(false);
       }
@@ -51,10 +48,10 @@ export function AdminLogin() {
       <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-lg dark:bg-gray-900 dark:border dark:border-gray-800">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Admin Access
+            Staff sign in
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Sign in to manage orders and view reports
+            Sign in, then choose Admin or Delivery with your access code
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -116,7 +113,7 @@ export function AdminLogin() {
               type="button"
               variant="outline"
               onClick={async () => {
-                const { error } = await signInWithGoogle("/admin/dashboard", "admin");
+                const { error } = await signInWithGoogle("/staff/portal", "admin");
                 if (error) {
                   setError(error.message);
                 }

@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { createClient, Session, User } from "@supabase/supabase-js";
+import { clearStaffPortal } from "../lib/staffAccess";
 import { projectId, publicAnonKey } from "../../supabase/info";
 
 const supabase = createClient(
@@ -303,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    clearStaffPortal();
     if (devAutoLogin) {
       setSession(null);
       setUser(null);

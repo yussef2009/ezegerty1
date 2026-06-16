@@ -111,7 +111,7 @@ export function Navbar() {
                     </DropdownMenuItem>
                   )}
                   {isDelivery && (
-                    <DropdownMenuItem onClick={() => navigate("/delivery/dashboard")}>
+                    <DropdownMenuItem onClick={() => navigate("/staff/portal")}>
                       <Truck className="mr-2 h-4 w-4" />
                       Delivery App
                     </DropdownMenuItem>
@@ -221,7 +221,7 @@ export function Navbar() {
                    </Link>
                  )}
                  {isDelivery && (
-                   <Link to="/delivery/dashboard" onClick={() => setIsOpen(false)}>
+                   <Link to="/staff/portal" onClick={() => setIsOpen(false)}>
                      <Button variant="ghost" className="w-full justify-start gap-2">
                        <Truck className="h-4 w-4" /> Delivery App
                      </Button>

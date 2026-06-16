@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "../../components/ui/dropdown-menu";
+import { isAdminPortalVerified, clearStaffPortal } from "../../lib/staffAccess";
 import { Badge } from "../../components/ui/badge";
 
 export function AdminLayout() {
@@ -43,15 +44,19 @@ export function AdminLayout() {
       return;
     }
     if (role === "delivery") {
-      navigate("/delivery/dashboard");
+      navigate("/staff/portal");
       return;
     }
     if (role !== "admin") {
       navigate("/client/dashboard");
+      return;
+    }
+    if (!isAdminPortalVerified()) {
+      navigate("/staff/portal");
     }
   }, [user, role, loading, navigate, devBypass]);
 
-  if (!devBypass && (loading || !user || role !== "admin")) {
+  if (!devBypass && (loading || !user || role !== "admin" || !isAdminPortalVerified())) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -63,7 +68,6 @@ export function AdminLayout() {
     { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Clients", path: "/admin/clients", icon: Users },
     { name: "Delivery Tracking", path: "/admin/tracking", icon: Truck },
-    { name: "Delivery Dashboard", path: "/admin/delivery-dashboard", icon: Truck },
     { name: "Assign Deliveries", path: "/admin/delivery", icon: Truck },
     { name: "Services Stats", path: "/admin/services-dashboard", icon: Sparkles },
     { name: "Manage Services", path: "/admin/services", icon: WashingMachine },
@@ -75,6 +79,7 @@ export function AdminLayout() {
   ];
 
   const handleSignOut = async () => {
+    clearStaffPortal();
     await signOut();
     navigate("/admin-login");
   };

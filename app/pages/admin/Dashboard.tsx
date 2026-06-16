@@ -137,8 +137,8 @@ export function AdminDashboard() {
             <RefreshCw className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`} />
             Sync
           </Button>
-          <Button onClick={() => navigate("/admin/delivery-dashboard")} variant="outline" className="h-10 gap-2">
-            <Truck className="h-4 w-4" /> Delivery Dashboard
+          <Button onClick={() => navigate("/staff/portal")} variant="outline" className="h-10 gap-2">
+            <Truck className="h-4 w-4" /> Delivery app
           </Button>
           <Button onClick={() => navigate("/admin/services")} className="bg-blue-600 hover:bg-blue-700 h-10 px-4">
             Manage Services

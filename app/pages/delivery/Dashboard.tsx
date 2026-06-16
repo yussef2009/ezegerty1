@@ -1,5 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { dbGetByPrefix, dbSet } from "../../lib/db";
 import { useAuth } from "../../context/AuthContext";
 import { Badge } from "../../components/ui/badge";
@@ -36,8 +35,7 @@ type GPSLocation = { lat: number; lng: number; timestamp: string };
 export function DeliveryDashboard() {
   const { t } = useLanguage();
   const d = t.delivery;
-  const { user, role, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
+  const { user, role } = useAuth();
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<DeliveryProfile | null>(null);
@@ -46,7 +44,8 @@ export function DeliveryDashboard() {
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<"disconnected" | "connected" | "denied">("disconnected");
   const [currentLocation, setCurrentLocation] = useState<GPSLocation | null>(null);
-  const [watchId, setWatchId] = useState<number | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const gpsActiveRef = useRef(false);
   const [deliveryTips, setDeliveryTips] = useState<Record<string, number>>({});
   const [mapKey, setMapKey] = useState(0);
 
@@ -82,12 +81,6 @@ export function DeliveryDashboard() {
   }, [role, userId]);
 
   useEffect(() => {
-    if (!authLoading && (!user || (role !== "delivery" && role !== "admin"))) {
-      navigate("/admin-login");
-    }
-  }, [user, role, authLoading, navigate]);
-
-  useEffect(() => {
     if (user) {
       loadProfile();
       fetchOrders();
@@ -98,6 +91,16 @@ export function DeliveryDashboard() {
     const interval = setInterval(fetchOrders, 10000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current != null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+        gpsActiveRef.current = false;
+      }
+    };
+  }, []);
 
   const syncLocation = useCallback(
     async (location: GPSLocation) => {
@@ -121,7 +124,18 @@ export function DeliveryDashboard() {
     [orders, profile, userId]
   );
 
-  const startGpsWatch = () => {
+  const stopGpsWatch = useCallback(() => {
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    gpsActiveRef.current = false;
+    setGpsEnabled(false);
+    setGpsStatus("disconnected");
+  }, []);
+
+  const startGpsWatch = useCallback(() => {
+    if (gpsActiveRef.current) return;
     if (!navigator.geolocation) {
       setGpsStatus("denied");
       return;
@@ -137,20 +151,21 @@ export function DeliveryDashboard() {
         syncLocation(location);
       },
       (error) => {
-        if (error.code === error.PERMISSION_DENIED) setGpsStatus("denied");
+        if (error.code === error.PERMISSION_DENIED) {
+          setGpsStatus("denied");
+          stopGpsWatch();
+        }
       },
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 8000 }
     );
-    setWatchId(id);
+    watchIdRef.current = id;
+    gpsActiveRef.current = true;
     setGpsEnabled(true);
-  };
+  }, [syncLocation, stopGpsWatch]);
 
   const toggleGPS = () => {
-    if (gpsEnabled) {
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
-      setGpsEnabled(false);
-      setGpsStatus("disconnected");
+    if (gpsActiveRef.current) {
+      stopGpsWatch();
       return;
     }
     if (!isProfileComplete(profile)) {
@@ -194,7 +209,7 @@ export function DeliveryDashboard() {
     if (openGpsAfter) startGpsWatch();
   };
 
-  if (authLoading || profileLoading) {
+  if (profileLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -286,10 +301,11 @@ export function DeliveryDashboard() {
                 )}
               </div>
               <Button
+                type="button"
                 onClick={toggleGPS}
                 className={gpsEnabled ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}
                 size="lg"
-                disabled={gpsStatus === "denied"}
+                disabled={gpsStatus === "denied" && !gpsEnabled}
               >
                 {gpsEnabled ? d.disableLocation : d.enableLocation}
               </Button>
