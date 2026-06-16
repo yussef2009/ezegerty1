@@ -43,13 +43,12 @@ function Root() {
 
 export const router = createBrowserRouter([
   {
-    path: "/",
-    index: true,
-    Component: Entry,
-  },
-  {
     path: "/admin-login",
     Component: AdminLogin,
+  },
+  {
+    path: "/entry",
+    Component: Entry,
   },
   {
     path: "/admin",
@@ -80,6 +79,7 @@ export const router = createBrowserRouter([
   {
     Component: Root,
     children: [
+      { index: true, Component: Home },
       { path: "home", Component: Home },
       { path: "services", Component: Services },
       { path: "order", Component: Order },

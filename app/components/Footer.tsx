@@ -10,7 +10,7 @@ export function Footer() {
       <div className="container mx-auto px-4 py-12 md:px-6">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <Link to="/home" className="flex items-center gap-2 mb-4">
+            <Link to="/" className="flex items-center gap-2 mb-4">
                <img src={logo} alt="Ezgerty" className="h-10 w-auto dark:brightness-200" />
             </Link>
             <p className="text-sm leading-relaxed">

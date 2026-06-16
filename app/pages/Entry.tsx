@@ -33,7 +33,7 @@ export function Entry() {
       </motion.div>
 
       <div className="grid w-full max-w-4xl gap-8 md:grid-cols-2">
-        <Link to="/home" className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:scale-105 hover:shadow-xl dark:bg-gray-900 dark:border dark:border-gray-800">
+        <Link to="/" className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-lg transition-all hover:scale-105 hover:shadow-xl dark:bg-gray-900 dark:border dark:border-gray-800">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-blue-900/20"></div>
           <div className="relative flex flex-col items-center text-center">
             <div className="mb-6 rounded-full bg-blue-100 p-6 dark:bg-blue-900/30">

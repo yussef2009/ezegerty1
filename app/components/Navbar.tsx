@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useTheme } from "next-themes";
-import { Menu, X, Sun, Moon, Settings, History, LogOut, LayoutDashboard, Truck, LayoutGrid } from "lucide-react";
+import { Menu, X, Sun, Moon, Settings, History, LogOut, LayoutDashboard, Truck, LayoutGrid, ShieldCheck } from "lucide-react";
 import { ClientNotificationBell } from "./ClientNotificationBell";
 import { Button } from "./ui/button";
 import { cn } from "../../lib/utils";
@@ -26,7 +26,7 @@ export function Navbar() {
   const navigate = useNavigate();
 
   const navLinks = [
-    { name: t.nav.home, href: "/home" },
+    { name: t.nav.home, href: "/" },
     { name: t.nav.services, href: "/services" },
     { name: t.nav.about, href: "/about" },
     { name: t.nav.contact, href: "/contact" },
@@ -40,11 +40,15 @@ export function Navbar() {
     navigate("/");
   };
 
+  const isAdmin = role === "admin";
+  const isDelivery = role === "delivery";
+  const isClient = !isAdmin && !isDelivery;
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 dark:border-gray-800">
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex h-16 items-center justify-between">
-          <Link to="/home" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <img src={logo} alt="Ezgerty" className="h-12 w-auto dark:brightness-200" />
           </Link>
 
@@ -85,7 +89,7 @@ export function Navbar() {
               <span className="sr-only">Toggle theme</span>
             </Button>
 
-            {user && role !== "admin" && role !== "delivery" && <ClientNotificationBell />}
+            {user && isClient && <ClientNotificationBell />}
             
             {user ? (
               <DropdownMenu>
@@ -100,36 +104,38 @@ export function Navbar() {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {role !== "admin" && role !== "delivery" && (
-                    <DropdownMenuItem onClick={() => navigate("/client/dashboard")}>
-                      <LayoutGrid className="mr-2 h-4 w-4" />
-                      My Dashboard
-                    </DropdownMenuItem>
-                  )}
-                  {role === "admin" && (
+                  {isAdmin && (
                     <DropdownMenuItem onClick={() => navigate("/admin/dashboard")}>
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       Admin Dashboard
                     </DropdownMenuItem>
                   )}
-                  {role === "delivery" && (
+                  {isDelivery && (
                     <DropdownMenuItem onClick={() => navigate("/delivery/dashboard")}>
                       <Truck className="mr-2 h-4 w-4" />
                       Delivery App
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => navigate("/track")}>
-                    <Truck className="mr-2 h-4 w-4" />
-                    Track Latest Order
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/client/history")}>
-                    <History className="mr-2 h-4 w-4" />
-                    Order History
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/client/settings")}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </DropdownMenuItem>
+                  {isClient && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate("/client/dashboard")}>
+                        <LayoutGrid className="mr-2 h-4 w-4" />
+                        My Dashboard
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate("/client/history")}>
+                        <History className="mr-2 h-4 w-4" />
+                        Order History
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate("/client/settings")}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate("/track")}>
+                        <Truck className="mr-2 h-4 w-4" />
+                        Track
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -145,6 +151,15 @@ export function Navbar() {
 
             <Link to="/order">
               <Button className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20">{t.nav.schedule}</Button>
+            </Link>
+
+            <Link
+              to="/admin-login"
+              className="ml-1 text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 transition-colors"
+              title="Admin"
+              aria-label="Admin login"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 opacity-40 hover:opacity-70" />
             </Link>
           </div>
 
@@ -198,23 +213,44 @@ export function Navbar() {
             ))}
             {user ? (
                <div className="grid gap-2 border-t pt-4 dark:border-gray-800">
-                 {role !== "admin" && role !== "delivery" && (
-                   <Link to="/client/dashboard" onClick={() => setIsOpen(false)}>
+                 {isAdmin && (
+                   <Link to="/admin/dashboard" onClick={() => setIsOpen(false)}>
                      <Button variant="ghost" className="w-full justify-start gap-2">
-                       <LayoutGrid className="h-4 w-4" /> My Dashboard
+                       <LayoutDashboard className="h-4 w-4" /> Admin Dashboard
                      </Button>
                    </Link>
                  )}
-                 <Link to="/client/history" onClick={() => setIsOpen(false)}>
-                   <Button variant="ghost" className="w-full justify-start gap-2">
-                     <History className="h-4 w-4" /> Order History
-                   </Button>
-                 </Link>
-                 <Link to="/client/settings" onClick={() => setIsOpen(false)}>
-                   <Button variant="ghost" className="w-full justify-start gap-2">
-                     <Settings className="h-4 w-4" /> Settings
-                   </Button>
-                 </Link>
+                 {isDelivery && (
+                   <Link to="/delivery/dashboard" onClick={() => setIsOpen(false)}>
+                     <Button variant="ghost" className="w-full justify-start gap-2">
+                       <Truck className="h-4 w-4" /> Delivery App
+                     </Button>
+                   </Link>
+                 )}
+                 {isClient && (
+                   <>
+                     <Link to="/client/dashboard" onClick={() => setIsOpen(false)}>
+                       <Button variant="ghost" className="w-full justify-start gap-2">
+                         <LayoutGrid className="h-4 w-4" /> My Dashboard
+                       </Button>
+                     </Link>
+                     <Link to="/client/history" onClick={() => setIsOpen(false)}>
+                       <Button variant="ghost" className="w-full justify-start gap-2">
+                         <History className="h-4 w-4" /> Order History
+                       </Button>
+                     </Link>
+                     <Link to="/client/settings" onClick={() => setIsOpen(false)}>
+                       <Button variant="ghost" className="w-full justify-start gap-2">
+                         <Settings className="h-4 w-4" /> Settings
+                       </Button>
+                     </Link>
+                     <Link to="/track" onClick={() => setIsOpen(false)}>
+                       <Button variant="ghost" className="w-full justify-start gap-2">
+                         <Truck className="h-4 w-4" /> Track
+                       </Button>
+                     </Link>
+                   </>
+                 )}
                  <Button variant="ghost" className="w-full justify-start gap-2 text-red-600" onClick={handleSignOut}>
                    <LogOut className="h-4 w-4" /> Sign Out
                  </Button>
@@ -226,6 +262,14 @@ export function Navbar() {
             )}
             <Link to="/order" onClick={() => setIsOpen(false)}>
               <Button className="w-full bg-blue-600">{t.nav.schedule}</Button>
+            </Link>
+            <Link
+              to="/admin-login"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-end gap-1 text-xs text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 pt-2"
+              aria-label="Admin login"
+            >
+              <ShieldCheck className="h-3 w-3 opacity-40" />
             </Link>
           </div>
         </div>

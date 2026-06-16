@@ -22,7 +22,7 @@ export function ClientSignup() {
       setError(error.message);
       setLoading(false);
     } else {
-      navigate("/home");
+      navigate("/");
     }
   };
 
