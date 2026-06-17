@@ -33,4 +33,5 @@ export type OrderRecord = {
   deliveredAt?: string;
   pickupDate?: string;
   pickupTime?: string;
+  fastPickupFee?: number;
 };

@@ -75,7 +75,7 @@ export function AdminLayout() {
     { name: "Premium Plans", path: "/admin/plans", icon: Sparkles },
     { name: "Promo Codes", path: "/admin/discounts", icon: Tag },
     { name: "Pending Payments", path: "/admin/payments", icon: Landmark },
-    { name: "Payment Settings", path: "/admin/settings", icon: Settings2 },
+    { name: "Settings", path: "/admin/settings", icon: Settings2 },
     { name: "Business Requests", path: "/admin/business-requests", icon: Users },
   ];
 

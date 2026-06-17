@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { motion } from "motion/react";
-import { CheckCircle, Loader2, Info, Trash2, Plus } from "lucide-react";
+import { CheckCircle, Loader2, Info, Trash2, Plus, Zap } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { useLanguage } from "../context/LanguageContext";
@@ -68,6 +68,7 @@ export function Order() {
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<Discount | null>(null);
   const [couponError, setCouponError] = useState("");
+  const [fastPickupSettings, setFastPickupSettings] = useState<{ enabled: boolean; price: number }>({ enabled: false, price: 0 });
   
   // Pre-fill user data if logged in
   useEffect(() => {
@@ -91,6 +92,14 @@ export function Order() {
         if (instapay?.number) {
           setInstapayNumber(instapay.number);
         }
+
+        const fastPickup = await dbGet("fast_pickup_settings");
+        if (fastPickup) {
+          setFastPickupSettings({
+            enabled: !!fastPickup.enabled,
+            price: Number(fastPickup.price) || 0,
+          });
+        }
         // discounts loaded on apply
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -107,8 +116,17 @@ export function Order() {
     name: "paymentMethod",
   });
 
+  const pickupTimeValue = useWatch({
+    control,
+    name: "pickupTime",
+  });
+
+  const isFastPickup = pickupTimeValue === "fast" && fastPickupSettings.enabled;
+  const fastFee = isFastPickup ? fastPickupSettings.price : 0;
+
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountedSubtotal = applyCoupon(subtotal, appliedCoupon);
+  const grandTotal = discountedSubtotal + fastFee;
   const hasOtherPending = orderItems.some((i) => i.isOther);
 
   const applyCouponCode = async () => {
@@ -197,7 +215,8 @@ export function Order() {
         subtotal,
         couponCode: appliedCoupon?.code || null,
         discountAmount: subtotal - discountedSubtotal,
-        total: discountedSubtotal + (data.tips || 0),
+        fastPickupFee: isFastPickup ? fastFee : 0,
+        total: grandTotal + (data.tips || 0),
         paymentStatus: data.paymentMethod === "instapay" ? "pending" : "confirmed",
         paymentMethod: data.paymentMethod.toLowerCase(),
         priceByAdmin: orderItems.some(item => item.isOther),
@@ -369,12 +388,17 @@ export function Order() {
                       <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
                         {hasOtherPending && subtotal === 0
                           ? "TBD"
-                          : `${discountedSubtotal} EGP`}
+                          : `${grandTotal} EGP`}
                       </span>
                     </div>
                     {appliedCoupon && subtotal > 0 && (
                       <p className="text-xs text-green-700 dark:text-green-400">
                         Coupon {appliedCoupon.code} applied (−{(subtotal - discountedSubtotal).toFixed(0)} EGP)
+                      </p>
+                    )}
+                    {isFastPickup && fastFee > 0 && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <Zap className="h-3 w-3" /> Fast Pickup fee: +{fastFee} EGP
                       </p>
                     )}
                     {orderItems.some((i) => i.isOther) && (
@@ -441,6 +465,9 @@ export function Order() {
                   <option value="morning">{t.order.morning}</option>
                   <option value="afternoon">{t.order.afternoon}</option>
                   <option value="evening">{t.order.evening}</option>
+                  {fastPickupSettings.enabled && (
+                    <option value="fast">⚡ {t.order.fast} (+{fastPickupSettings.price} EGP)</option>
+                  )}
                 </select>
               </div>
             </div>
