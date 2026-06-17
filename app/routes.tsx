@@ -8,6 +8,7 @@ import { Contact } from "./pages/Contact";
 import { Entry } from "./pages/Entry";
 import { AdminLogin } from "./pages/admin/Login";
 import { AdminDashboard } from "./pages/admin/Dashboard";
+import { AdminRevenue } from "./pages/admin/Revenue";
 import { AdminLayout } from "./pages/admin/AdminLayout";
 import { AdminClients } from "./pages/admin/Clients";
 import { AdminDiscounts } from "./pages/admin/Discounts";
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
     Component: AdminLayout,
     children: [
       { path: "dashboard", Component: AdminDashboard },
+      { path: "revenue", Component: AdminRevenue },
       { path: "clients", Component: AdminClients },
       { path: "discounts", Component: AdminDiscounts },
       { path: "plans", Component: AdminPlans },

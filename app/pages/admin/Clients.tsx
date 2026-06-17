@@ -25,7 +25,7 @@ import {
   DialogDescription,
   DialogFooter
 } from "../../components/ui/dialog";
-import { dbGet, dbSet } from "../../lib/db";
+import { dbGet, dbSet, dbGetByPrefix } from "../../lib/db";
 import { toast } from "sonner";
 
 type UserSubscription = {
@@ -60,10 +60,109 @@ export function AdminClients() {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const data = await dbGet("clients_list");
-      setClients(data && Array.isArray(data) ? data : []);
+      const [storedClientsVal, ordersVal, profilesVal] = await Promise.all([
+        dbGet("clients_list"),
+        dbGetByPrefix("order:"),
+        dbGetByPrefix("user_profile:"),
+      ]);
+
+      const storedClients = Array.isArray(storedClientsVal) ? storedClientsVal : [];
+      
+      // Filter out demo clients from stored clients (c1, c2, c3 and specific demo emails)
+      const filteredStored = storedClients.filter(
+        c => c && 
+             c.id !== "c1" && 
+             c.id !== "c2" && 
+             c.id !== "c3" && 
+             c.email !== "zeyad@example.com" && 
+             c.email !== "laila@example.com" && 
+             c.email !== "karim@business.com"
+      );
+
+      // Create a map keyed by user identifier (userId or email)
+      const clientsMap = new Map<string, Client>();
+      filteredStored.forEach(c => {
+        const key = c.id || c.email;
+        if (key) clientsMap.set(key, c);
+      });
+
+      // Integrate user profiles
+      const profiles = Array.isArray(profilesVal) ? profilesVal : [];
+      profiles.forEach(p => {
+        if (!p || !p.userId) return;
+        const key = p.userId;
+        const existing = clientsMap.get(key);
+        
+        clientsMap.set(key, {
+          id: p.userId,
+          name: p.name || existing?.name || "Customer",
+          email: p.email || existing?.email || "",
+          phone: p.phone || existing?.phone || "",
+          address: p.address || existing?.address || "",
+          lastActive: p.updatedAt || existing?.lastActive || new Date().toISOString(),
+          blocked: existing?.blocked || false,
+          totalOrders: existing?.totalOrders || 0,
+          joinedAt: existing?.joinedAt || p.updatedAt || new Date().toISOString(),
+          preferredPayment: existing?.preferredPayment || "Cash",
+        });
+      });
+
+      // Integrate orders
+      const orders = Array.isArray(ordersVal) ? ordersVal : [];
+      orders.forEach(o => {
+        if (!o) return;
+        
+        // Skip orders for demo users
+        if (
+          o.userEmail === "zeyad@example.com" || 
+          o.userEmail === "laila@example.com" || 
+          o.userEmail === "karim@business.com" ||
+          o.userId === "c1" ||
+          o.userId === "c2" ||
+          o.userId === "c3"
+        ) {
+          return;
+        }
+
+        const key = o.userId || o.userEmail;
+        if (!key) return;
+
+        const existing = clientsMap.get(key);
+        
+        const orderDateStr = o.createdAt || new Date().toISOString();
+        const joinedAt = existing?.joinedAt && existing.joinedAt < orderDateStr ? existing.joinedAt : orderDateStr;
+        const lastActive = existing?.lastActive && existing.lastActive > orderDateStr ? existing.lastActive : orderDateStr;
+
+        clientsMap.set(key, {
+          id: existing?.id || key,
+          name: o.name || existing?.name || "Customer",
+          email: o.userEmail || existing?.email || "",
+          phone: o.phone || existing?.phone || "",
+          address: o.address || existing?.address || "",
+          lastActive,
+          blocked: existing?.blocked || false,
+          totalOrders: 0, // Will sum next
+          joinedAt,
+          preferredPayment: o.paymentMethod ? (o.paymentMethod.toLowerCase() === "instapay" ? "Instapay" : "Cash") : (existing?.preferredPayment || "Cash"),
+        });
+      });
+
+      // Sum exact totals and count orders
+      clientsMap.forEach((client) => {
+        const count = orders.filter(o => o && (o.userId === client.id || o.userEmail === client.email)).length;
+        client.totalOrders = count;
+      });
+
+      // Convert map to sorted array
+      const mergedClients = Array.from(clientsMap.values());
+      mergedClients.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
+
+      setClients(mergedClients);
+      
+      // Save the cleaned, merged clients list back to the DB to purge demo records permanently
+      await dbSet("clients_list", mergedClients);
     } catch (error) {
-      console.error("Error fetching clients:", error);
+      console.error("Error fetching/merging clients:", error);
     } finally {
       setLoading(false);
     }

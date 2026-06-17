@@ -107,8 +107,21 @@ export function AdminDashboard() {
     }
   };
 
+  const getStartOfWeek = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const start = new Date(now.setDate(diff));
+    start.setHours(0, 0, 0, 0);
+    return start;
+  };
+
   const stats = useMemo(() => {
     const totalRevenue = orders.reduce((acc, o) => acc + revenueFromOrder(o), 0);
+    const startOfWeek = getStartOfWeek();
+    const weeklyRevenue = orders
+      .filter((o) => new Date(o.createdAt) >= startOfWeek)
+      .reduce((acc, o) => acc + revenueFromOrder(o), 0);
     const customerTips = orders.reduce((acc, o) => acc + (revenueFromOrder(o) > 0 ? o.tips || 0 : 0), 0);
     const deliveryTips = orders.reduce(
       (acc, o) => acc + (revenueFromOrder(o) > 0 ? o.deliveryTip || 0 : 0),
@@ -119,7 +132,7 @@ export function AdminDashboard() {
     const instapayPending = orders.filter(
       (o) => o.paymentMethod === "instapay" && (!o.paymentStatus || o.paymentStatus === "pending")
     ).length;
-    return { totalRevenue, customerTips, deliveryTips, byCategory, pendingOrders, instapayPending };
+    return { totalRevenue, weeklyRevenue, customerTips, deliveryTips, byCategory, pendingOrders, instapayPending };
   }, [orders, services]);
 
   const recentOrders = orders.slice(0, 5);
@@ -130,7 +143,7 @@ export function AdminDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Overview</h1>
-          <p className="text-gray-500">Revenue, service categories, and delivery tips</p>
+          <p className="text-gray-500">Weekly revenue, service categories, and delivery tips</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button onClick={fetchOrders} variant="outline" size="sm" className="h-10 px-4 gap-2">
@@ -148,13 +161,19 @@ export function AdminDashboard() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <StatCard icon={ShoppingBag} label="Total Orders" value={String(orders.length)} color="blue" />
-        <StatCard
-          icon={TrendingUp}
-          label="Total Revenue"
-          value={`${stats.totalRevenue.toLocaleString()} EGP`}
-          color="green"
-          sub="Confirmed payments only"
-        />
+        <div 
+          onClick={() => navigate("/admin/revenue")} 
+          className="cursor-pointer transition-transform hover:scale-102 duration-200"
+          title="Click to view full revenue history"
+        >
+          <StatCard
+            icon={TrendingUp}
+            label="Weekly Revenue"
+            value={`${stats.weeklyRevenue.toLocaleString()} EGP`}
+            color="green"
+            sub="This week's payments only"
+          />
+        </div>
         <StatCard
           icon={Gift}
           label="Customer Tips"

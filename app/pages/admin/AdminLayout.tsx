@@ -66,6 +66,7 @@ export function AdminLayout() {
 
   const menuItems = [
     { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
+    { name: "Revenue Reports", path: "/admin/revenue", icon: Landmark },
     { name: "Clients", path: "/admin/clients", icon: Users },
     { name: "Delivery Tracking", path: "/admin/tracking", icon: Truck },
     { name: "Assign Deliveries", path: "/admin/delivery", icon: Truck },
