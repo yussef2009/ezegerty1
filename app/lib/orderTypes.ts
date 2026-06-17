@@ -6,6 +6,7 @@ export type OrderItem = {
   isOther?: boolean;
   otherDescription?: string;
   category?: string;
+  wasFreeByPlan?: boolean;
 };
 
 export type OrderRecord = {
@@ -34,4 +35,10 @@ export type OrderRecord = {
   pickupDate?: string;
   pickupTime?: string;
   fastPickupFee?: number;
+  planSubscriptionFee?: number;
+  isPlanPayment?: boolean;
+  planName?: string;
+  appliedPlanId?: string;
+  planDiscount?: number;
 };
+

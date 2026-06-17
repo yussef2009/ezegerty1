@@ -5,11 +5,13 @@ import { dbGet, dbGetByPrefix } from "../../lib/db";
 import type { OrderRecord } from "../../lib/orderTypes";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Loader2, Package, LogOut, Clock, CreditCard, Bell } from "lucide-react";
+import { Loader2, Package, LogOut, Clock, CreditCard, Bell, Crown, Zap, Calendar, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { ClientOtherPaymentCard } from "../../components/ClientOtherPaymentCard";
 import { useClientNotifications } from "../../hooks/useClientNotifications";
 import { markNotificationRead } from "../../lib/notifications";
+import { getBillingCycleStartDate } from "../../lib/orderFinance";
+
 
 export function ClientDashboard() {
   const { t } = useLanguage();
@@ -19,6 +21,7 @@ export function ClientDashboard() {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [instapayNumber, setInstapayNumber] = useState("");
   const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState<any>(null);
   const { unread, unreadCount, refresh: refreshNotifications } = useClientNotifications(user?.id, 8000);
 
   useEffect(() => {
@@ -33,18 +36,22 @@ export function ClientDashboard() {
     setLoading(true);
     try {
       const values = (await dbGetByPrefix("order:")) as OrderRecord[];
-      const myOrders = values.filter((o) => o.userId === user.id || o.userEmail === user.email);
+      const myOrders = values.filter((o) => o && (o.userId === user.id || o.userEmail === user.email));
       myOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(myOrders);
 
       const instapay = await dbGet("instapay_account");
       if (instapay?.number) setInstapayNumber(instapay.number);
+
+      const sub = await dbGet(`user_subscription:${user.id}`);
+      setSubscription(sub);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     if (user && role !== "admin" && role !== "delivery") {
@@ -65,7 +72,36 @@ export function ClientDashboard() {
     await refreshNotifications();
   };
 
+  const getQuotaStatus = () => {
+    if (!subscription || !subscription.active) return [];
+    const cycleStart = getBillingCycleStartDate(subscription.startedAt, subscription.interval);
+    
+    // Filter orders in current billing cycle
+    const cycleOrders = orders.filter(o => o && o.createdAt && new Date(o.createdAt).getTime() >= cycleStart.getTime());
+    
+    // Calculate consumed quantities for each service in the subscription plan
+    const allowances = subscription.includedServices || [];
+    return allowances.map((allowance: any) => {
+      let consumed = 0;
+      for (const order of cycleOrders) {
+        if (order.items) {
+          for (const item of order.items) {
+            if (item.serviceId === allowance.serviceId && (item.price === 0 || item.wasFreeByPlan)) {
+              consumed += item.quantity;
+            }
+          }
+        }
+      }
+      return {
+        ...allowance,
+        consumed,
+        remaining: Math.max(0, allowance.qty - consumed)
+      };
+    });
+  };
+
   const awaitingPaymentOrders = orders.filter((o) => o.awaitingClientPayment && o.otherPriceSet);
+
 
   if (authLoading || !user) {
     return (
@@ -114,8 +150,110 @@ export function ClientDashboard() {
           </div>
         </div>
 
+        {/* Subscription / Plan Widget */}
+        <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl shadow-sm border dark:border-gray-800 overflow-hidden">
+          <div className="p-6 border-b dark:border-gray-800 flex items-center justify-between bg-blue-50/30 dark:bg-blue-950/10">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Crown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              My Premium Plan Status
+            </h2>
+            {subscription?.active && (
+              <Badge className={subscription.paymentStatus === 'confirmed' ? "bg-green-600 text-white" : "bg-amber-500 text-white"}>
+                {subscription.paymentStatus === 'confirmed' ? "Active / Verified" : "Pending Payment Verification"}
+              </Badge>
+            )}
+          </div>
+          <div className="p-6 space-y-6">
+            {subscription && subscription.active ? (
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-2xl font-black text-blue-900 dark:text-blue-400">
+                      {subscription.planName} Plan
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Started: {new Date(subscription.startedAt).toLocaleDateString()} ({subscription.interval} cycle)
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Plan Benefits Summary:</p>
+                    {subscription.discountPercent > 0 && (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                        {subscription.discountPercent}% extra discount on all items
+                      </p>
+                    )}
+                    {subscription.fastPickupIncluded && (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+                        <Zap className="h-4 w-4 fill-amber-500 text-amber-500 shrink-0" />
+                        Free Fast Pickup (⚡) included
+                      </p>
+                    )}
+                    {subscription.firstDeliveryFree && (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                        First order is completely free
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-xl border dark:border-gray-800">
+                  <h4 className="font-semibold text-sm text-gray-800 dark:text-gray-200">
+                    Service Quotas This Billing Month:
+                  </h4>
+                  {getQuotaStatus().length === 0 ? (
+                    <p className="text-xs text-gray-500 py-2">No service quotas configured for this plan.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {getQuotaStatus().map((quota: any, idx: number) => {
+                        const percentConsumed = Math.min(100, Math.round((quota.consumed / quota.qty) * 100));
+                        return (
+                          <div key={idx} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="font-medium text-gray-700 dark:text-gray-300">{quota.serviceName}</span>
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                {quota.consumed} / {quota.qty} used ({quota.remaining} remaining)
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                                style={{ width: `${percentConsumed}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Crown className="h-10 w-10 text-gray-300 dark:text-gray-700 mb-2 font-light" />
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  You do not have an active premium subscription plan.
+                </p>
+                <p className="text-xs text-gray-400 mt-1 max-w-sm">
+                  Subscribe to a premium plan on the home page to get extra discounts, free fast pickup, and free services!
+                </p>
+                <Button 
+                  onClick={() => navigate("/")} 
+                  className="mt-4 bg-blue-600 hover:bg-blue-700 text-xs h-9"
+                >
+                  View Premium Plans
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="mb-8 rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 shadow-sm overflow-hidden">
           <div className="p-4 border-b dark:border-gray-800 flex items-center justify-between bg-orange-50/50 dark:bg-orange-900/10">
+
             <h2 className="font-bold flex items-center gap-2 text-gray-900 dark:text-white">
               <Bell className="h-5 w-5 text-orange-500" /> {c.notifications}
             </h2>

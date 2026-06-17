@@ -10,8 +10,9 @@ import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
-import { dbSet, dbGet } from "../lib/db";
-import { applyCoupon, type Discount } from "../lib/orderFinance";
+import { dbSet, dbGet, dbGetByPrefix } from "../lib/db";
+import { applyCoupon, type Discount, getBillingCycleStartDate } from "../lib/orderFinance";
+
 
 type Service = {
   id: string;
@@ -29,7 +30,9 @@ type OrderItem = {
   isOther: boolean;
   otherDescription?: string;
   category?: string;
+  wasFreeByPlan?: boolean;
 };
+
 
 type OrderFormData = {
   name: string;
@@ -69,6 +72,38 @@ export function Order() {
   const [appliedCoupon, setAppliedCoupon] = useState<Discount | null>(null);
   const [couponError, setCouponError] = useState("");
   const [fastPickupSettings, setFastPickupSettings] = useState<{ enabled: boolean; price: number }>({ enabled: false, price: 0 });
+  const [userSubscription, setUserSubscription] = useState<any>(null);
+  const [currentCycleOrders, setCurrentCycleOrders] = useState<any[]>([]);
+  const [totalUserOrders, setTotalUserOrders] = useState<number>(0);
+
+  // Fetch subscription, orders count, and cycle history
+  useEffect(() => {
+    if (!user) return;
+    const loadSubscriptionData = async () => {
+      try {
+        const sub = await dbGet(`user_subscription:${user.id}`);
+        setUserSubscription(sub);
+
+        const allOrders = (await dbGetByPrefix("order:")) as any[];
+        const myOrders = allOrders.filter(
+          (o) => o && (o.userId === user.id || o.userEmail === user.email)
+        );
+        setTotalUserOrders(myOrders.length);
+
+        if (sub && sub.active) {
+          const cycleStart = getBillingCycleStartDate(sub.startedAt, sub.interval);
+          const cycleOrders = myOrders.filter(
+            (o) => o && o.createdAt && new Date(o.createdAt).getTime() >= cycleStart.getTime()
+          );
+          setCurrentCycleOrders(cycleOrders);
+        }
+      } catch (err) {
+        console.error("Error loading customer subscription details:", err);
+      }
+    };
+    loadSubscriptionData();
+  }, [user]);
+
   
   // Pre-fill user data if logged in
   useEffect(() => {
@@ -121,13 +156,33 @@ export function Order() {
     name: "pickupTime",
   });
 
+  const hasFreeFastPickup = userSubscription && userSubscription.active && userSubscription.fastPickupIncluded;
   const isFastPickup = pickupTimeValue === "fast" && fastPickupSettings.enabled;
-  const fastFee = isFastPickup ? fastPickupSettings.price : 0;
+  const fastFee = isFastPickup ? (hasFreeFastPickup ? 0 : fastPickupSettings.price) : 0;
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountedSubtotal = applyCoupon(subtotal, appliedCoupon);
-  const grandTotal = discountedSubtotal + fastFee;
+
+  const planDiscountPercent = userSubscription && userSubscription.active ? (userSubscription.discountPercent || 0) : 0;
+  const hasFirstDeliveryFree = userSubscription && userSubscription.active && userSubscription.firstDeliveryFree && totalUserOrders === 0;
+
+  let planDiscount = (discountedSubtotal * planDiscountPercent) / 100;
+  if (hasFirstDeliveryFree) {
+    planDiscount = discountedSubtotal; // 100% discount
+  }
+
+  const postPlanSubtotal = discountedSubtotal - planDiscount;
+  
+  const planSubscriptionFeeToAdd = (userSubscription && 
+    userSubscription.active && 
+    userSubscription.subscriptionPaymentMethod === "cash" && 
+    userSubscription.paymentStatus === "pending") 
+      ? Number(userSubscription.price || 0) 
+      : 0;
+
+  const grandTotal = postPlanSubtotal + fastFee + planSubscriptionFeeToAdd;
   const hasOtherPending = orderItems.some((i) => i.isOther);
+
 
   const applyCouponCode = async () => {
     setCouponError("");
@@ -151,13 +206,12 @@ export function Order() {
   const addItem = () => {
     if (!selectedService) return;
     
-    let newItem: OrderItem;
     if (selectedService === "other") {
       if (!otherDescription.trim()) {
         alert("Please describe what you need");
         return;
       }
-      newItem = {
+      const newItem: OrderItem = {
         serviceId: "other",
         name: t.order.other,
         quantity: 1,
@@ -165,25 +219,95 @@ export function Order() {
         isOther: true,
         otherDescription: otherDescription
       };
+      setOrderItems([...orderItems, newItem]);
     } else {
       const service = services.find(s => s.id === selectedService);
       if (!service) return;
       
-      newItem = {
-        serviceId: service.id,
-        name: service.name,
-        quantity: parseInt(String(quantity)),
-        price: service.price,
-        isOther: false,
-        category: service.category,
-      };
+      const qty = parseInt(String(quantity)) || 1;
+      
+      const subActive = userSubscription && userSubscription.active;
+      const allowance = subActive 
+        ? (userSubscription.includedServices?.find((s: any) => s.serviceId === service.id)?.qty || 0)
+        : 0;
+        
+      if (subActive && allowance > 0) {
+        // Calculate consumed in prior cycle orders
+        let consumed = 0;
+        for (const order of currentCycleOrders) {
+          if (order.items) {
+            for (const item of order.items) {
+              if (item.serviceId === service.id && (item.price === 0 || item.wasFreeByPlan)) {
+                consumed += item.quantity;
+              }
+            }
+          }
+        }
+        
+        // Calculate consumed in current order list
+        let addedInForm = 0;
+        for (const item of orderItems) {
+          if (item.serviceId === service.id && item.wasFreeByPlan) {
+            addedInForm += item.quantity;
+          }
+        }
+        
+        const remainingQuota = Math.max(0, allowance - consumed - addedInForm);
+        
+        if (remainingQuota > 0) {
+          const freeQty = Math.min(qty, remainingQuota);
+          const paidQty = qty - freeQty;
+          
+          const newItems = [...orderItems];
+          if (freeQty > 0) {
+            newItems.push({
+              serviceId: service.id,
+              name: `${service.name} (Plan Allowance)`,
+              quantity: freeQty,
+              price: 0,
+              isOther: false,
+              category: service.category,
+              wasFreeByPlan: true
+            });
+          }
+          if (paidQty > 0) {
+            newItems.push({
+              serviceId: service.id,
+              name: service.name,
+              quantity: paidQty,
+              price: service.price,
+              isOther: false,
+              category: service.category
+            });
+          }
+          setOrderItems(newItems);
+        } else {
+          setOrderItems([...orderItems, {
+            serviceId: service.id,
+            name: service.name,
+            quantity: qty,
+            price: service.price,
+            isOther: false,
+            category: service.category
+          }]);
+        }
+      } else {
+        setOrderItems([...orderItems, {
+          serviceId: service.id,
+          name: service.name,
+          quantity: qty,
+          price: service.price,
+          isOther: false,
+          category: service.category
+        }]);
+      }
     }
     
-    setOrderItems([...orderItems, newItem]);
     setSelectedService("");
     setQuantity(1);
     setOtherDescription("");
   };
+
 
   const removeItem = (index: number) => {
     setOrderItems(orderItems.filter((_, i) => i !== index));
@@ -211,19 +335,42 @@ export function Order() {
         userEmail: user?.email || null,
         status: "pending",
         createdAt: new Date().toISOString(),
-        items: orderItems,
+        items: orderItems.map(item => ({
+          serviceId: item.serviceId,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          isOther: !!item.isOther,
+          otherDescription: item.otherDescription,
+          category: item.category,
+          wasFreeByPlan: !!item.wasFreeByPlan
+        })),
         subtotal,
         couponCode: appliedCoupon?.code || null,
         discountAmount: subtotal - discountedSubtotal,
         fastPickupFee: isFastPickup ? fastFee : 0,
+        appliedPlanId: userSubscription?.active ? userSubscription.planId : null,
+        planDiscount: planDiscount,
         total: grandTotal + (data.tips || 0),
         paymentStatus: data.paymentMethod === "instapay" ? "pending" : "confirmed",
         paymentMethod: data.paymentMethod.toLowerCase(),
         priceByAdmin: orderItems.some(item => item.isOther),
         instapayNumber: data.paymentMethod === "instapay" ? instapayNumber : null
       };
+
+      if (planSubscriptionFeeToAdd > 0) {
+        orderData.planSubscriptionFee = planSubscriptionFeeToAdd;
+        orderData.planName = userSubscription.planName;
+      }
       
       await dbSet(`order:${newOrderId}`, orderData);
+      
+      if (user && planSubscriptionFeeToAdd > 0) {
+        await dbSet(`user_subscription:${user.id}`, {
+          ...userSubscription,
+          paymentStatus: "confirmed"
+        });
+      }
       
       setOrderId(newOrderId);
       setIsSubmitted(true);
@@ -239,6 +386,7 @@ export function Order() {
       setLoading(false);
     }
   };
+
 
   if (isSubmitted) {
     return (
@@ -396,15 +544,31 @@ export function Order() {
                         Coupon {appliedCoupon.code} applied (−{(subtotal - discountedSubtotal).toFixed(0)} EGP)
                       </p>
                     )}
-                    {isFastPickup && fastFee > 0 && (
+                    {planDiscount > 0 && (
+                      <p className="text-xs text-green-700 dark:text-green-400 font-medium">
+                        {hasFirstDeliveryFree 
+                          ? "🎉 First Delivery Free plan benefit (−" + planDiscount.toFixed(0) + " EGP)" 
+                          : `Premium Plan Discount (${planDiscountPercent}%) (−${planDiscount.toFixed(0)} EGP)`}
+                      </p>
+                    )}
+                    {isFastPickup && (
                       <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                        <Zap className="h-3 w-3" /> Fast Pickup fee: +{fastFee} EGP
+                        <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
+                        {hasFreeFastPickup 
+                          ? "Fast Pickup fee: 0 EGP (Free with Plan)" 
+                          : `Fast Pickup fee: +${fastFee} EGP`}
+                      </p>
+                    )}
+                    {planSubscriptionFeeToAdd > 0 && (
+                      <p className="text-xs text-blue-700 dark:text-blue-400 font-bold border-t dark:border-gray-800 pt-1">
+                        + Premium Plan Subscription ({userSubscription.planName}): +{planSubscriptionFeeToAdd} EGP (Pay cash on this order)
                       </p>
                     )}
                     {orderItems.some((i) => i.isOther) && (
                       <p className="text-xs text-orange-700 dark:text-orange-300">{t.order.priceByAdmin}</p>
                     )}
                   </div>
+
                 </div>
               )}
             </div>

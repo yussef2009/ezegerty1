@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { dbGetByPrefix, dbSet } from "../../lib/db";
+import { dbGetByPrefix, dbSet, dbGet } from "../../lib/db";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -29,6 +29,9 @@ type Order = {
   createdAt: string;
   items?: OrderItem[];
   priceByAdmin?: boolean;
+  isPlanPayment?: boolean;
+  userId?: string;
+  planName?: string;
 };
 
 export function AdminPayments() {
@@ -111,6 +114,18 @@ export function AdminPayments() {
     
     try {
       await dbSet(`order:${orderId}`, updatedOrder);
+      
+      // Update subscription status if this is a plan payment
+      if (updatedOrder.isPlanPayment && updatedOrder.userId) {
+        const subKey = `user_subscription:${updatedOrder.userId}`;
+        const sub = await dbGet(subKey);
+        if (sub) {
+          sub.active = (status === "confirmed");
+          sub.paymentStatus = status;
+          await dbSet(subKey, sub);
+        }
+      }
+
       setOrders(orders.filter(o => o.id !== orderId));
       setPriceOverride(prev => {
         const updated = { ...prev };
@@ -122,6 +137,7 @@ export function AdminPayments() {
       toast.error("Update failed");
     }
   };
+
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -262,23 +278,33 @@ export function AdminPayments() {
             {orders.find(o => o.id === expandedId) && (
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Order Items</h4>
-                  {orders.find(o => o.id === expandedId)?.items?.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 mb-2">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-                        {item.isOther ? (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{item.otherDescription}</p>
-                        ) : (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity} × {item.price} EGP</p>
-                        )}
-                      </div>
-                      <p className="font-semibold text-gray-900 dark:text-white">
-                        {item.isOther ? "Admin Sets" : `${item.quantity * item.price} EGP`}
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Order Details</h4>
+                  {orders.find(o => o.id === expandedId)?.isPlanPayment ? (
+                    <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-xl">
+                      <p className="font-bold text-blue-900 dark:text-blue-400">Premium Subscription Plan Purchase</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        Subscription requested for plan: <span className="font-bold text-gray-900 dark:text-white">{orders.find(o => o.id === expandedId)?.planName}</span>
                       </p>
                     </div>
-                  ))}
+                  ) : (
+                    orders.find(o => o.id === expandedId)?.items?.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 mb-2">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                          {item.isOther ? (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{item.otherDescription}</p>
+                          ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity} × {item.price} EGP</p>
+                          )}
+                        </div>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {item.isOther ? "Admin Sets" : `${item.quantity * item.price} EGP`}
+                        </p>
+                      </div>
+                    ))
+                  )}
                 </div>
+
 
                 {orders.find(o => o.id === expandedId)?.priceByAdmin && (
                   <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded border border-orange-200 dark:border-orange-800">

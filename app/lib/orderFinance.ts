@@ -69,3 +69,35 @@ export function categoryRevenue(
   }
   return out;
 }
+
+export function getBillingCycleStartDate(startedAt: string, interval: "weekly" | "monthly" | "yearly" | "pieces"): Date {
+  const start = new Date(startedAt);
+  const now = new Date();
+  
+  if (interval === "weekly") {
+    const oneWeekMs = 604800000;
+    const diff = now.getTime() - start.getTime();
+    if (diff < 0) return start;
+    const cycleStartMs = start.getTime() + Math.floor(diff / oneWeekMs) * oneWeekMs;
+    return new Date(cycleStartMs);
+  }
+  
+  if (interval === "monthly") {
+    const cycleStart = new Date(now.getFullYear(), now.getMonth(), start.getDate());
+    if (cycleStart > now) {
+      cycleStart.setMonth(cycleStart.getMonth() - 1);
+    }
+    return cycleStart;
+  }
+  
+  if (interval === "yearly") {
+    const cycleStart = new Date(now.getFullYear(), start.getMonth(), start.getDate());
+    if (cycleStart > now) {
+      cycleStart.setFullYear(cycleStart.getFullYear() - 1);
+    }
+    return cycleStart;
+  }
+  
+  return start;
+}
+

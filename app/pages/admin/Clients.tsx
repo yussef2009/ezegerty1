@@ -52,7 +52,8 @@ export function AdminClients() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [plans, setPlans] = useState<{ id: string; name: string }[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [activatingPremium, setActivatingPremium] = useState(false);
   const [clientPremium, setClientPremium] = useState<string | null>(null);
@@ -179,7 +180,7 @@ export function AdminClients() {
   useEffect(() => {
     fetchClients();
     dbGet("plans").then((data) => {
-      if (data && Array.isArray(data)) setPlans(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })));
+      if (data && Array.isArray(data)) setPlans(data);
     });
   }, []);
 
@@ -215,9 +216,17 @@ export function AdminClients() {
       await dbSet(`user_subscription:${selectedClient.id}`, {
         planId: plan.id,
         planName: plan.name,
+        price: plan.price || 0,
+        interval: plan.interval || "monthly",
         active: true,
         startedAt: new Date().toISOString(),
         activatedBy: "admin",
+        includedServices: plan.includedServices || [],
+        fastPickupIncluded: !!plan.fastPickupIncluded,
+        discountPercent: plan.discountPercent || 0,
+        firstDeliveryFree: !!plan.firstDeliveryFree,
+        subscriptionPaymentMethod: "cash",
+        paymentStatus: "confirmed"
       });
       setClientPremium(plan.name);
       toast.success(`Premium activated for ${selectedClient.name}`);
